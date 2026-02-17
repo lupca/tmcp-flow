@@ -53,11 +53,19 @@ function App() {
           config: { title: 'GitOps Flow', duration: durationInFrames }
         })
       });
+      if (!response.ok) {
+        const text = await response.text();
+        let detail;
+        try { detail = JSON.parse(text); } catch { detail = { error: text }; }
+        alert('Render failed: ' + (detail.error || response.statusText));
+        return;
+      }
       const data = await response.json();
       if (data.success) setVideoUrl(data.videoUrl);
-      else alert('Render failed');
+      else alert('Render failed: ' + (data.error || 'Unknown error'));
     } catch (err) {
-      alert('Error connecting to server');
+      console.error('Error:', err);
+      alert('Backend server is not running. Start it with: npm run dev:full');
     } finally {
       setLoading(false);
     }

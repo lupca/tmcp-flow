@@ -46,8 +46,11 @@ export default function ArgoK3dFlow({
             y: (height / 2) - (centerY * kf.zoom)
           };
         }
+        // Node not found: fallback to center with default values
+        return { frame: kf.frame, zoom: kf.zoom || 1, x: 0, y: 0 };
       }
-      return kf;
+      // Ensure x and y always have numeric values
+      return { frame: kf.frame, zoom: kf.zoom || 1, x: kf.x ?? 0, y: kf.y ?? 0 };
     }).sort((a, b) => a.frame - b.frame);
   }, [cameraSequence, nodes, width, height]);
 

@@ -16,21 +16,29 @@ const OUT_DIR = path.join(process.cwd(), 'out');
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 
 let bundleLocation = null;
+let isBundleReady = false;
 
 async function preBundle() {
     console.log('Pre-bundling project...');
     try {
         bundleLocation = await bundle({ entryPoint: path.resolve('src/remotion/RemotionRoot.jsx') });
+        isBundleReady = true;
         console.log(`Bundle created: ${bundleLocation}`);
     } catch (e) {
         console.error('Bundle failed:', e);
     }
 }
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', bundleReady: isBundleReady });
+});
+
 app.post('/api/render', async (req, res) => {
-    if (!bundleLocation) return res.status(503).json({ error: 'Bundling...' });
+    if (!bundleLocation) return res.status(503).json({ error: 'Server is still bundling. Please wait and try again.' });
 
     const { nodes, edges, width, height, durationInFrames, config } = req.body;
+    console.log(`[Render] Starting: ${width}x${height}, ${durationInFrames} frames`);
 
     try {
         const scenarios = JSON.parse(fs.readFileSync(SCENARIOS_PATH, 'utf-8'));
@@ -49,18 +57,30 @@ app.post('/api/render', async (req, res) => {
             renderFps: 60,
         };
 
+        console.log('[Render] Selecting composition...');
         const composition = await selectComposition({ serveUrl: bundleLocation, id: 'ArgoK3dFlow', inputProps });
 
+        console.log('[Render] Rendering media...');
         await renderMedia({
-            composition,
+            composition: {
+                ...composition,
+                durationInFrames: durationInFrames || 300,
+            },
             serveUrl: bundleLocation,
             codec: 'h264',
             outputLocation: outputPath,
             inputProps,
+            onProgress: ({ progress }) => {
+                if (Math.round(progress * 100) % 25 === 0) {
+                    console.log(`[Render] Progress: ${Math.round(progress * 100)}%`);
+                }
+            },
         });
 
+        console.log(`[Render] Complete: ${outputFilename}`);
         res.json({ success: true, videoUrl: `/out/${outputFilename}` });
     } catch (error) {
+        console.error('[Render] Error:', error.message);
         res.status(500).json({ error: 'Render failed', details: error.message });
     }
 });
@@ -69,4 +89,3 @@ app.listen(port, () => {
     console.log(`Server: http://localhost:${port}`);
     preBundle();
 });
-
