@@ -50,7 +50,8 @@ app.post('/api/render', async (req, res) => {
             nodes: nodes || scenario.nodes,
             edges: edges || scenario.edges,
             config: config || scenario.config,
-            cameraSequence: scenario.cameraSequence,
+            // prefer cameraSequence sent from the client, otherwise fall back to scenario
+            cameraSequence: req.body.cameraSequence ?? scenario.cameraSequence,
             renderWidth: width || 1280,
             renderHeight: height || 720,
             renderDuration: durationInFrames || 300,

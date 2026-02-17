@@ -62,6 +62,29 @@ body {
   font-size: 14px;
 }
 
+.camera-section .keyframe-list {
+  max-height: 160px;
+  overflow: auto;
+}
+
+.camera-section .keyframe-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 6px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: #ddd;
+}
+
+.camera-section .keyframe-item .remove {
+  color: #f87171;
+  cursor: pointer;
+}
+
 .render-button {
   margin-top: 10px;
   padding: 14px;

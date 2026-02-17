@@ -35,6 +35,12 @@ function App() {
 
   const [format, setFormat] = useState('landscape');
   const [durationSec, setDurationSec] = useState(5);
+  const [cameraSequence, setCameraSequence] = useState([]);
+  const [kfFrame, setKfFrame] = useState(0);
+  const [kfZoom, setKfZoom] = useState(1);
+  const [kfTargetNodeId, setKfTargetNodeId] = useState('');
+  const [kfX, setKfX] = useState(0);
+  const [kfY, setKfY] = useState(0);
 
   const handleRender = async () => {
     setLoading(true);
@@ -50,7 +56,8 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nodes, edges, width, height, durationInFrames,
-          config: { title: 'GitOps Flow', duration: durationInFrames }
+          config: { title: 'GitOps Flow', duration: durationInFrames },
+          cameraSequence
         })
       });
       if (!response.ok) {
@@ -89,6 +96,48 @@ function App() {
           <input className="setting-input" type="range" min="2" max="15" value={durationSec} onChange={(e) => setDurationSec(parseInt(e.target.value))} />
         </div>
 
+        <div className="setting-group camera-section">
+          <label className="setting-label">Camera keyframes</label>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="setting-input" type="number" min={0} max={durationSec * 60} value={kfFrame} onChange={(e) => setKfFrame(parseInt(e.target.value || 0))} style={{ width: 80 }} />
+            <input className="setting-input" type="number" step="0.1" min={0.1} max={5} value={kfZoom} onChange={(e) => setKfZoom(parseFloat(e.target.value || 1))} style={{ width: 100 }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <select className="setting-select" value={kfTargetNodeId} onChange={(e) => setKfTargetNodeId(e.target.value)}>
+              <option value="">-- target node (optional) --</option>
+              {nodes.map(n => <option key={n.id} value={n.id}>{n.data?.label || n.id}</option>)}
+            </select>
+          </div>
+
+          <div style={{ display: kfTargetNodeId ? 'none' : 'flex', gap: 8, marginTop: 8 }}>
+            <input className="setting-input" type="number" value={kfX} onChange={(e) => setKfX(parseInt(e.target.value || 0))} placeholder="x" style={{ width: 80 }} />
+            <input className="setting-input" type="number" value={kfY} onChange={(e) => setKfY(parseInt(e.target.value || 0))} placeholder="y" style={{ width: 80 }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button className="render-button" style={{ padding: '8px 10px', fontSize: 13 }} onClick={() => {
+              const kf = kfTargetNodeId ? { frame: Math.max(0, kfFrame), targetNodeId: kfTargetNodeId, zoom: kfZoom } : { frame: Math.max(0, kfFrame), x: kfX, y: kfY, zoom: kfZoom };
+              setCameraSequence(s => [...s, kf].sort((a, b) => a.frame - b.frame));
+            }}>Add keyframe</button>
+            <button className="render-button" style={{ background: '#374151', boxShadow: 'none', padding: '8px 10px', fontSize: 13 }} onClick={() => { setCameraSequence([]); }}>Clear</button>
+          </div>
+
+          {cameraSequence.length > 0 && (
+            <div className="keyframe-list" style={{ marginTop: 10 }}>
+              {cameraSequence.map((kf, idx) => (
+                <div key={idx} className="keyframe-item" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, marginTop: 6 }}>
+                  <div style={{ fontSize: 13, color: '#ddd' }}>{kf.frame}f — {kf.targetNodeId ? `node:${kf.targetNodeId}` : `x:${kf.x},y:${kf.y}`} — zoom:{kf.zoom}</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="download-link" onClick={() => { setCameraSequence(s => s.filter((_, i) => i !== idx)); }}>Remove</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button className="render-button" onClick={handleRender} disabled={loading}>
           {loading ? '🎬 Rendering...' : '🚀 Export MP4'}
         </button>
@@ -107,6 +156,7 @@ function App() {
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        cameraSequence={cameraSequence}
       />
     </div>
   );
