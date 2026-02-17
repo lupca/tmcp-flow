@@ -1,0 +1,122 @@
+#root {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #0a0a0a;
+}
+
+.App {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.control-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 280px;
+  padding: 20px;
+  border-radius: 12px;
+  font-family: inherit;
+  color: white;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.setting-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.setting-select,
+.setting-input {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.render-button {
+  margin-top: 10px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #f97316;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
+}
+
+.render-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: #fb923c;
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+}
+
+.render-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.render-button:disabled {
+  background: #333;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.success-message {
+  color: #4ade80;
+  font-size: 14px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.video-preview {
+  margin-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 15px;
+}
+
+.download-link {
+  display: block;
+  margin-top: 10px;
+  color: #60a5fa;
+  text-decoration: none;
+  font-size: 14px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.download-link:hover {
+  text-decoration: underline;
+}

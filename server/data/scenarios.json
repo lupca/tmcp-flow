@@ -1,0 +1,49 @@
+[
+    {
+        "config": {
+            "title": "GitOps Overview",
+            "duration": 150
+        },
+        "cameraSequence": [
+            {
+                "frame": 0,
+                "x": 0,
+                "y": 0,
+                "zoom": 0.8
+            },
+            {
+                "frame": 60,
+                "targetNodeId": "source-code",
+                "zoom": 1.5
+            },
+            {
+                "frame": 120,
+                "targetNodeId": "argocd",
+                "zoom": 1.5
+            }
+        ]
+    },
+    {
+        "config": {
+            "title": "Deploying to k3d",
+            "duration": 150
+        },
+        "cameraSequence": [
+            {
+                "frame": 0,
+                "targetNodeId": "gitops-repo",
+                "zoom": 1.2
+            },
+            {
+                "frame": 75,
+                "targetNodeId": "deployment",
+                "zoom": 1.8
+            },
+            {
+                "frame": 150,
+                "targetNodeId": "user",
+                "zoom": 1.2
+            }
+        ]
+    }
+]
