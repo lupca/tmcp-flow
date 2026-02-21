@@ -5,6 +5,40 @@ import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+
+// ── Performance: Quality Presets ──────────────────────────────────────
+const cpuCount = os.cpus().length;
+const QUALITY_PRESETS = {
+    draft: {
+        videoBitrate: '2M',
+        jpegQuality: 70,
+        concurrency: Math.max(2, Math.floor(cpuCount * 0.75)),
+        codec: 'h264',
+        label: 'Draft (fastest)',
+    },
+    standard: {
+        videoBitrate: '8M',
+        jpegQuality: 85,
+        concurrency: Math.max(2, Math.floor(cpuCount / 2)),
+        codec: 'h264',
+        label: 'Standard',
+    },
+    high: {
+        videoBitrate: '15M',
+        jpegQuality: 95,
+        concurrency: Math.max(2, Math.floor(cpuCount / 3)),
+        codec: 'h264',
+        label: 'High Quality',
+    },
+    prores: {
+        videoBitrate: null,
+        jpegQuality: null,
+        concurrency: Math.max(2, Math.floor(cpuCount / 2)),
+        codec: 'prores-hq',
+        label: 'ProRes HQ (huge file)',
+    },
+};
 
 const app = express();
 const port = 3000;
@@ -217,64 +251,208 @@ app.delete('/api/flows/:id', (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/api/render', async (req, res) => {
-    if (!bundleLocation) return res.status(503).json({ error: 'Server is still bundling. Please wait and try again.' });
+// ── Render helpers ───────────────────────────────────────────────────
+function parseRenderParams(body) {
+    const qualityKey = body.quality || 'standard';
+    const preset = QUALITY_PRESETS[qualityKey] || QUALITY_PRESETS.standard;
 
-    const { nodes, edges, config } = req.body;
-    const renderWidth = req.body.renderWidth || req.body.width || 1080;
-    const renderHeight = req.body.renderHeight || req.body.height || 1920;
-    const renderDuration = req.body.renderDuration || req.body.durationInFrames || 300;
-    const renderFps = req.body.renderFps || 60;
-    const edgeEffectType = req.body.edgeEffectType || 'neon_path';
-    const previewMode = req.body.previewMode ?? false;
-    console.log(`[Render] Starting: ${renderWidth}x${renderHeight}, ${renderDuration} frames (${(renderDuration / renderFps).toFixed(1)}s @ ${renderFps}fps)`);
-    console.log(`[Render] Edge Effect: ${edgeEffectType}, Preview Mode: ${previewMode}`);
+    return {
+        renderWidth: body.renderWidth || body.width || 1080,
+        renderHeight: body.renderHeight || body.height || 1920,
+        renderDuration: body.renderDuration || body.durationInFrames || 300,
+        renderFps: body.renderFps || 60,
+        edgeEffectType: body.edgeEffectType || 'neon_path',
+        previewMode: body.previewMode ?? false,
+        preset,
+        qualityKey,
+    };
+}
 
+function buildInputProps(body, params) {
+    let scenario;
     try {
         const scenarios = JSON.parse(fs.readFileSync(SCENARIOS_PATH, 'utf-8'));
-        const scenario = scenarios[0]; // Default to first scenario
-        const outputFilename = `render-${Date.now()}.mp4`;
+        scenario = scenarios[0];
+    } catch { scenario = { nodes: [], edges: [], config: {}, cameraSequence: [] }; }
+
+    return {
+        nodes: body.nodes || scenario.nodes,
+        edges: body.edges || scenario.edges,
+        config: body.config || scenario.config,
+        cameraSequence: body.cameraSequence ?? scenario.cameraSequence,
+        renderWidth: params.renderWidth,
+        renderHeight: params.renderHeight,
+        renderDuration: params.renderDuration,
+        renderFps: params.renderFps,
+        edgeEffectType: params.edgeEffectType,
+        previewMode: params.previewMode,
+    };
+}
+
+function buildRenderOptions(composition, outputPath, inputProps, preset, onProgress) {
+    const isProres = preset.codec.startsWith('prores');
+    const ext = isProres ? '.mov' : '.mp4';
+    const finalPath = outputPath.replace(/\.[^.]+$/, ext);
+
+    const opts = {
+        composition,
+        serveUrl: bundleLocation,
+        codec: preset.codec,
+        outputLocation: finalPath,
+        inputProps,
+        concurrency: preset.concurrency,
+        hardwareAcceleration: 'if-possible',
+        chromiumOptions: { gl: 'angle' },
+        onProgress,
+    };
+
+    // JPEG frames + bitrate only for non-ProRes
+    if (!isProres) {
+        opts.imageFormat = 'jpeg';
+        opts.jpegQuality = preset.jpegQuality;
+        opts.videoBitrate = preset.videoBitrate;
+        opts.audioBitrate = '128k';
+    }
+
+    return { opts, finalPath };
+}
+
+// ── GET /api/render/presets — list available presets ─────────────────
+app.get('/api/render/presets', (_req, res) => {
+    const presets = Object.entries(QUALITY_PRESETS).map(([key, val]) => ({
+        key,
+        label: val.label,
+        codec: val.codec,
+        concurrency: val.concurrency,
+    }));
+    res.json({ presets, cpuCount });
+});
+
+// ── POST /api/render — optimised, returns JSON on complete ──────────
+let activeRender = null;
+
+app.post('/api/render', async (req, res) => {
+    if (!bundleLocation) return res.status(503).json({ error: 'Server is still bundling. Please wait and try again.' });
+    if (activeRender) return res.status(409).json({ error: 'A render is already in progress.' });
+
+    const params = parseRenderParams(req.body);
+    const { preset, qualityKey, renderWidth, renderHeight, renderDuration, renderFps } = params;
+
+    console.log(`[Render] Starting: ${renderWidth}x${renderHeight}, ${renderDuration} frames (${(renderDuration / renderFps).toFixed(1)}s @ ${renderFps}fps)`);
+    console.log(`[Render] Quality: ${qualityKey} | Concurrency: ${preset.concurrency} | HW Accel: if-possible | GL: angle`);
+
+    const startTime = Date.now();
+    activeRender = { startTime, aborted: false };
+
+    try {
+        const inputProps = buildInputProps(req.body, params);
+        const outputFilename = `render-${Date.now()}.${preset.codec.startsWith('prores') ? 'mov' : 'mp4'}`;
         const outputPath = path.join(OUT_DIR, outputFilename);
 
-        const inputProps = {
-            nodes: nodes || scenario.nodes,
-            edges: edges || scenario.edges,
-            config: config || scenario.config,
-            cameraSequence: req.body.cameraSequence ?? scenario.cameraSequence,
-            renderWidth,
-            renderHeight,
-            renderDuration,
-            renderFps,
-            edgeEffectType,
-            previewMode,
-        };
-
-        console.log('[Render] Selecting composition...');
         const composition = await selectComposition({ serveUrl: bundleLocation, id: 'DynamicFlowScene', inputProps });
 
-        console.log('[Render] Rendering media...');
-        await renderMedia({
-            composition,
-            serveUrl: bundleLocation,
-            codec: 'h264',
-            outputLocation: outputPath,
-            inputProps,
-            onProgress: ({ progress }) => {
-                if (Math.round(progress * 100) % 25 === 0) {
-                    console.log(`[Render] Progress: ${Math.round(progress * 100)}%`);
-                }
-            },
+        const { opts, finalPath } = buildRenderOptions(composition, outputPath, inputProps, preset, ({ progress }) => {
+            const pct = Math.round(progress * 100);
+            if (pct % 10 === 0) {
+                const elapsed = (Date.now() - startTime) / 1000;
+                const eta = progress > 0 ? ((elapsed / progress) * (1 - progress)).toFixed(1) : '...';
+                console.log(`[Render] ${pct}% — elapsed ${elapsed.toFixed(1)}s — ETA ${eta}s`);
+            }
         });
 
-        console.log(`[Render] Complete: ${outputFilename}`);
-        res.json({ success: true, videoUrl: `/out/${outputFilename}` });
+        await renderMedia(opts);
+
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        const finalFilename = path.basename(finalPath);
+        console.log(`[Render] ✅ Complete in ${elapsed}s: ${finalFilename}`);
+        res.json({ success: true, videoUrl: `/out/${finalFilename}`, elapsed: Number(elapsed), quality: qualityKey });
     } catch (error) {
         console.error('[Render] Error:', error.message);
         res.status(500).json({ error: 'Render failed', details: error.message });
+    } finally {
+        activeRender = null;
+    }
+});
+
+// ── POST /api/render-stream — SSE real-time progress ────────────────
+app.post('/api/render-stream', async (req, res) => {
+    if (!bundleLocation) {
+        res.status(503).json({ error: 'Server is still bundling.' });
+        return;
+    }
+    if (activeRender) {
+        res.status(409).json({ error: 'A render is already in progress.' });
+        return;
+    }
+
+    // Setup SSE headers
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+    });
+
+    const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+    const params = parseRenderParams(req.body);
+    const { preset, qualityKey, renderWidth, renderHeight, renderDuration, renderFps } = params;
+
+    send({ type: 'status', message: `Starting render — ${qualityKey} quality, ${preset.concurrency} threads` });
+
+    const startTime = Date.now();
+    activeRender = { startTime, aborted: false };
+    let lastPct = -1;
+
+    // Handle client disconnect
+    req.on('close', () => {
+        activeRender && (activeRender.aborted = true);
+    });
+
+    try {
+        const inputProps = buildInputProps(req.body, params);
+        const outputFilename = `render-${Date.now()}.${preset.codec.startsWith('prores') ? 'mov' : 'mp4'}`;
+        const outputPath = path.join(OUT_DIR, outputFilename);
+
+        send({ type: 'status', message: 'Selecting composition...' });
+        const composition = await selectComposition({ serveUrl: bundleLocation, id: 'DynamicFlowScene', inputProps });
+
+        send({ type: 'status', message: 'Rendering frames...' });
+        const { opts, finalPath } = buildRenderOptions(composition, outputPath, inputProps, preset, ({ progress }) => {
+            const pct = Math.round(progress * 100);
+            if (pct > lastPct) {
+                lastPct = pct;
+                const elapsed = (Date.now() - startTime) / 1000;
+                const eta = progress > 0.01 ? Math.round((elapsed / progress) * (1 - progress)) : null;
+                send({ type: 'progress', progress: pct, elapsed: Math.round(elapsed), eta });
+            }
+        });
+
+        await renderMedia(opts);
+
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        const finalFilename = path.basename(finalPath);
+        send({ type: 'complete', videoUrl: `/out/${finalFilename}`, elapsed: Number(elapsed), quality: qualityKey });
+    } catch (error) {
+        send({ type: 'error', message: error.message });
+    } finally {
+        activeRender = null;
+        res.end();
+    }
+});
+
+// ── POST /api/render/cancel ─────────────────────────────────────────
+app.post('/api/render/cancel', (_req, res) => {
+    if (activeRender) {
+        activeRender.aborted = true;
+        activeRender = null;
+        res.json({ success: true, message: 'Render cancelled.' });
+    } else {
+        res.json({ success: false, message: 'No active render to cancel.' });
     }
 });
 
 app.listen(port, () => {
     console.log(`Server: http://localhost:${port}`);
+    console.log(`[Perf] CPU cores: ${cpuCount} | Default concurrency: ${QUALITY_PRESETS.standard.concurrency}`);
     preBundle();
 });

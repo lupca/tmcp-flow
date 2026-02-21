@@ -234,6 +234,11 @@ function StudioInner() {
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
+  const [renderQuality, setRenderQuality] = useState('standard');
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [renderEta, setRenderEta] = useState(null);
+  const [renderElapsed, setRenderElapsed] = useState(null);
+  const [renderStatus, setRenderStatus] = useState(null);
 
   const [promptText, setPromptText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -294,11 +299,11 @@ function StudioInner() {
       zoomWide,
     });
     setCameraSequence(seq);
-    
+
     // Annotate edges with activation timing based on camera sequence
     const annotatedEdges = annotateEdgesWithTiming(seq, edges, nodes);
     setEdges(annotatedEdges);
-    
+
     // Auto-enable preview mode to see the synchronized animation
     setPreviewMode(true);
   }, [nodes, edges, cameraSequence.length, holdFrames, panFrames, zoomClose, zoomWide, setEdges]);
@@ -306,6 +311,10 @@ function StudioInner() {
   const handleExport = async () => {
     setLoading(true);
     setVideoUrl(null);
+    setRenderProgress(0);
+    setRenderEta(null);
+    setRenderElapsed(null);
+    setRenderStatus('Starting...');
 
     const lastFrame = cameraSequence.length
       ? Math.max(...cameraSequence.map((k) => k.frame))
@@ -313,7 +322,7 @@ function StudioInner() {
     const renderDuration = Math.max(lastFrame + 90, 300);
 
     try {
-      const res = await fetch('/api/render', {
+      const res = await fetch('/api/render-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -326,6 +335,7 @@ function StudioInner() {
           renderFps: 60,
           edgeEffectType,
           previewMode,
+          quality: renderQuality,
         }),
       });
 
@@ -337,17 +347,60 @@ function StudioInner() {
         return;
       }
 
-      const data = await res.json();
-      if (data.success) {
-        setVideoUrl(data.videoUrl);
-      } else {
-        alert('Render failed: ' + (data.error || 'Unknown error'));
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'status') {
+              setRenderStatus(event.message);
+            } else if (event.type === 'progress') {
+              setRenderProgress(event.progress);
+              setRenderEta(event.eta);
+              setRenderElapsed(event.elapsed);
+              setRenderStatus(`Rendering... ${event.progress}%`);
+            } else if (event.type === 'complete') {
+              setVideoUrl(event.videoUrl);
+              setRenderProgress(100);
+              setRenderElapsed(event.elapsed);
+              setRenderEta(null);
+              setRenderStatus(null);
+            } else if (event.type === 'error') {
+              alert('Render failed: ' + event.message);
+              setRenderStatus(null);
+            }
+          } catch (e) {
+            console.warn('SSE parse error:', e, line);
+          }
+        }
       }
     } catch (err) {
       console.error('Export error:', err);
       alert('Backend server not running. Start with: npm run dev:full');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelRender = async () => {
+    try {
+      await fetch('/api/render/cancel', { method: 'POST' });
+      setLoading(false);
+      setRenderStatus(null);
+      setRenderProgress(0);
+    } catch (err) {
+      console.error('Cancel error:', err);
     }
   };
 
@@ -598,413 +651,474 @@ function StudioInner() {
   return (
     <div className="studio-layout">
       <div className="studio-main">
-      <div className="studio-sidebar-left glass-panel">
-        <h2 className="sidebar-title">🤖 AI Flow</h2>
-        <p className="sidebar-hint">Mô tả hệ thống, AI sẽ sinh sơ đồ</p>
+        <div className="studio-sidebar-left glass-panel">
+          <h2 className="sidebar-title">🤖 AI Flow</h2>
+          <p className="sidebar-hint">Mô tả hệ thống, AI sẽ sinh sơ đồ</p>
 
-        <div className="section">
-          <label className="section-label">Prompt</label>
-          <textarea
-            className="field-input prompt-textarea"
-            placeholder="Ví dụ: Hệ thống CI/CD với GitOps, ArgoCD, Docker Registry, K3d cluster..."
-            value={promptText}
-            onChange={(e) => setPromptText(e.target.value)}
-            rows={5}
-            disabled={isGenerating}
-          />
-
-          <button
-            className="btn btn-generate"
-            onClick={handleGenerateFlow}
-            disabled={isGenerating || !promptText.trim()}
-          >
-            {isGenerating ? '⏳ Đang sinh...' : '🚀 Generate Flow'}
-          </button>
-        </div>
-
-        {aiStatus && (
-          <div className="ai-status-panel">
-            <div className={`ai-status-dot ${aiStatus.step === 'done' ? 'done' : 'active'}`} />
-            <span className="ai-status-text">{aiStatus.message}</span>
-          </div>
-        )}
-
-        {aiError && (
-          <div className="ai-error-panel">
-            ⚠️ {aiError}
-          </div>
-        )}
-
-        <div className="section" style={{ marginTop: 'auto' }}>
-          <label className="section-label">Quick Templates</label>
-          {[
-            { label: 'GitOps CI/CD', prompt: 'GitOps CI/CD pipeline with GitHub Actions, Docker Registry, ArgoCD, and Kubernetes cluster with deployments and services' },
-            { label: 'Microservices', prompt: 'Microservices architecture with API Gateway, Auth Service, User Service, Product Service, Order Service, Message Queue, and PostgreSQL databases' },
-            { label: 'ML Pipeline', prompt: 'Machine Learning pipeline with data ingestion, feature engineering, model training, model registry, A/B testing, and serving infrastructure' },
-          ].map((t) => (
-            <button
-              key={t.label}
-              className="btn btn-template"
-              onClick={() => setPromptText(t.prompt)}
+          <div className="section">
+            <label className="section-label">Prompt</label>
+            <textarea
+              className="field-input prompt-textarea"
+              placeholder="Ví dụ: Hệ thống CI/CD với GitOps, ArgoCD, Docker Registry, K3d cluster..."
+              value={promptText}
+              onChange={(e) => setPromptText(e.target.value)}
+              rows={5}
               disabled={isGenerating}
+            />
+
+            <button
+              className="btn btn-generate"
+              onClick={handleGenerateFlow}
+              disabled={isGenerating || !promptText.trim()}
             >
-              {t.label}
+              {isGenerating ? '⏳ Đang sinh...' : '🚀 Generate Flow'}
             </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="studio-canvas" ref={canvasRef}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges.map(edge => ({
-            ...edge,
-            data: { ...edge.data, previewMode, effectType: edgeEffectType }
-          }))}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          nodesDraggable={true}
-          nodesConnectable={true}
-          fitView
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background variant="dots" color="#1E293B" gap={24} size={2} />
-          <Controls style={{ background: '#0F172A', border: '1px solid rgba(148, 163, 184, 0.15)' }} />
-          <MiniMap nodeColor="#334155" style={{ background: '#0B0F19', border: '1px solid rgba(148, 163, 184, 0.15)' }} />
-        </ReactFlow>
-      </div>
-
-      <div className="studio-sidebar glass-panel">
-        <div className="studio-sidebar-header">
-          <div>
-            <h2 className="sidebar-title">Studio</h2>
-            <p className="sidebar-hint">TikTok 9:16 · 1080×1920</p>
-          </div>
-          <button className="btn btn-ghost" onClick={() => navigate('/flows')}>
-            Flow Manager
-          </button>
-        </div>
-
-        {selectedNodeId && (
-          <div className="selected-indicator">
-            Selected: <strong>{selectedNodeId}</strong>
-          </div>
-        )}
-
-        <div className="tab-nav">
-          <button 
-            className={`tab-btn ${activeTab === 'blueprint' ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab('blueprint')}
-          >
-            🏗️ Blueprint
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'directing' ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab('directing')}
-          >
-            🎬 Directing
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'fx' ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab('fx')}
-          >
-            ✨ FX
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'render' ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab('render')}
-          >
-            🎞️ Render
-          </button>
-        </div>
-
-        {activeTab === 'blueprint' && (
-          <div className="tab-content">
-            <div className="section">
-              <label className="section-label">Flow Metadata</label>
-              <div className="form-field">
-                <label className="field-label">Flow Name</label>
-                <input
-                  className="field-input"
-                  value={flowName}
-                  onChange={(e) => setFlowName(e.target.value)}
-                  placeholder="Untitled Flow"
-                />
-              </div>
-              <div className="form-row">
-                <button className="btn btn-save" onClick={handleSaveVersion} disabled={isSaving}>
-                  {isSaving ? 'Saving...' : 'Save Version'}
-                </button>
-              </div>
-              <div className="form-row">
-                <button className="btn btn-secondary" onClick={handleExportJson}>
-                  Download Script (.json)
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => importInputRef.current?.click()}
-                >
-                  Import JSON
-                </button>
-                <input
-                  ref={importInputRef}
-                  type="file"
-                  accept="application/json"
-                  style={{ display: 'none' }}
-                  onChange={handleImportJson}
-                />
-              </div>
-            </div>
-
-            <div className="section">
-              <label className="section-label">Version History</label>
-              {!flowId && (
-                <p className="empty-hint">Save a version to enable history.</p>
-              )}
-              {flowId && (
-                <>
-                  <button className="btn btn-secondary" onClick={() => loadVersions(flowId)} style={{ marginBottom: '12px' }}>
-                    Load History
-                  </button>
-                  <div className="version-list-inline">
-                    {versions.length === 0 && (
-                      <p className="empty-hint">No versions yet.</p>
-                    )}
-                    {versions.map((version) => (
-                      <div key={version.id} className="version-item">
-                        <div className="version-meta">
-                          <div className="version-note">
-                            {version.versionNote || 'Untitled update'}
-                          </div>
-                          <div className="version-date">
-                            {new Date(version.createdAt).toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="version-actions">
-                          <button className="btn btn-secondary" onClick={() => handleRollback(version)}>
-                            Rollback
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'directing' && (
-          <div className="tab-content">
-            <div className="section">
-              <label className="section-label">Auto Direct (AI Camera)</label>
-
-              <div className="form-row" style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={previewMode}
-                    onChange={(e) => setPreviewMode(e.target.checked)}
-                    style={{ width: '18px', height: '18px' }}
-                  />
-                  <span style={{ fontSize: '14px' }}>🎬 Sync Edges with Camera</span>
-                </label>
-              </div>
-
-              <div className="form-row">
-                <div className="form-field">
-                  <label className="field-label">Hold (frames)</label>
-                  <input className="field-input" type="number" min={10} max={300} value={holdFrames}
-                    onChange={(e) => setHoldFrames(Math.max(10, parseInt(e.target.value || '60', 10)))} />
-                </div>
-                <div className="form-field">
-                  <label className="field-label">Pan (frames)</label>
-                  <input className="field-input" type="number" min={5} max={120} value={panFrames}
-                    onChange={(e) => setPanFrames(Math.max(5, parseInt(e.target.value || '30', 10)))} />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-field">
-                  <label className="field-label">Close zoom</label>
-                  <input className="field-input" type="number" step="0.1" min={0.5} max={5} value={zoomClose}
-                    onChange={(e) => setZoomClose(parseFloat(e.target.value || '1.8'))} />
-                </div>
-                <div className="form-field">
-                  <label className="field-label">Wide zoom</label>
-                  <input className="field-input" type="number" step="0.1" min={0.1} max={3} value={zoomWide}
-                    onChange={(e) => setZoomWide(parseFloat(e.target.value || '0.5'))} />
-                </div>
-              </div>
-
-              <button className="btn btn-auto" onClick={handleAutoRirect}>
-                ✨ Auto Direct (AI Camera)
-              </button>
-            </div>
-
-            <div className="section">
-              <label className="section-label">Add Camera Keyframe</label>
-
-          <div className="form-row">
-            <div className="form-field">
-              <label className="field-label">Target Node</label>
-              <select
-                className="field-input"
-                value={kfTargetNodeId}
-                onChange={(e) => setKfTargetNodeId(e.target.value)}
-              >
-                <option value="">— select node —</option>
-                {selectableNodes.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.data?.title || n.id}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-field">
-              <label className="field-label">Frame</label>
-              <input
-                className="field-input"
-                type="number"
-                min={0}
-                value={kfFrame}
-                onChange={(e) => setKfFrame(parseInt(e.target.value || '0', 10))}
-              />
-            </div>
-            <div className="form-field">
-              <label className="field-label">Zoom</label>
-              <input
-                className="field-input"
-                type="number"
-                step="0.1"
-                min={0.1}
-                max={5}
-                value={kfZoom}
-                onChange={(e) => setKfZoom(parseFloat(e.target.value || '1'))}
-              />
-            </div>
-          </div>
-
-              <button className="btn btn-add" onClick={addKeyframe}>
-                + Add Keyframe
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'fx' && (
-          <div className="tab-content">
-            <div className="section">
-              <label className="section-label">✨ Edge Visual Effects</label>
-          
-          <div className="form-field">
-            <label className="field-label">Effect Type</label>
-            <select 
-              className="field-input" 
-              value={edgeEffectType} 
-              onChange={(e) => setEdgeEffectType(e.target.value)}
-              style={{ 
-                fontSize: '13px',
-                padding: '8px',
-                background: 'rgba(15, 23, 42, 0.8)',
-                color: '#fff',
-                border: '1px solid rgba(148, 163, 184, 0.2)',
-                borderRadius: '6px',
-              }}
-            >
-              <option value="neon_path">⚡ Neon Path (Microservices)</option>
-              <option value="particle_blast">💥 Particle Blast (CI/CD)</option>
-              <option value="stepped_circuit">🔧 Stepped Circuit (Kubernetes)</option>
-              <option value="ghost_echo">👻 Ghost Echo (Monitoring)</option>
-              <option value="electric_bolt">⚡ Electric Bolt (Lightning)</option>
-              <option value="data_packets">📦 Data Packets (Streaming)</option>
-              <option value="liquid_gradient">🌊 Liquid Gradient (Flow)</option>
-              <option value="pulse_glow">💓 Pulse Glow (Energy)</option>
-            </select>
-          </div>
-
-          <div style={{
-            marginTop: '12px',
-            padding: '10px',
-            background: 'rgba(59, 130, 246, 0.1)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            borderRadius: '6px',
-            fontSize: '11px',
-            color: 'rgba(255, 255, 255, 0.8)',
-          }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#60a5fa' }}>💡 Effect Suggestions</div>
-            <table style={{ width: '100%', fontSize: '10px', lineHeight: '1.4' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.2)' }}>
-                  <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Effect</th>
-                  <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Feel</th>
-                  <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Best For</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={{ padding: '3px 0' }}>⚡ Neon Path</td>
-                  <td style={{ padding: '3px 0' }}>Modern</td>
-                  <td style={{ padding: '3px 0' }}>API Calls</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '3px 0' }}>💥 Particle Blast</td>
-                  <td style={{ padding: '3px 0' }}>Powerful</td>
-                  <td style={{ padding: '3px 0' }}>CI/CD Success</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '3px 0' }}>🔧 Stepped Circuit</td>
-                  <td style={{ padding: '3px 0' }}>Precise</td>
-                  <td style={{ padding: '3px 0' }}>Kubernetes</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '3px 0' }}>👻 Ghost Echo</td>
-                  <td style={{ padding: '3px 0' }}>Smooth</td>
-                  <td style={{ padding: '3px 0' }}>Monitoring</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'render' && (
-          <div className="tab-content">
-            <div className="section export-section">
-          <button
-            className="btn btn-export"
-            onClick={handleExport}
-            disabled={loading}
-          >
-            {loading ? '🎬 Rendering...' : '🚀 Export MP4'}
-          </button>
-
-          {videoUrl && (
-            <div className="export-result">
-              <div className="success-msg">✨ Render Complete!</div>
-              <video
-                src={videoUrl}
-                controls
-                autoPlay
-                width="100%"
-                style={{ borderRadius: 8, marginTop: 8 }}
-              />
-              <a href={videoUrl} download className="download-link">
-                📥 Download MP4
-              </a>
+          {aiStatus && (
+            <div className="ai-status-panel">
+              <div className={`ai-status-dot ${aiStatus.step === 'done' ? 'done' : 'active'}`} />
+              <span className="ai-status-text">{aiStatus.message}</span>
             </div>
           )}
+
+          {aiError && (
+            <div className="ai-error-panel">
+              ⚠️ {aiError}
             </div>
+          )}
+
+          <div className="section" style={{ marginTop: 'auto' }}>
+            <label className="section-label">Quick Templates</label>
+            {[
+              { label: 'GitOps CI/CD', prompt: 'GitOps CI/CD pipeline with GitHub Actions, Docker Registry, ArgoCD, and Kubernetes cluster with deployments and services' },
+              { label: 'Microservices', prompt: 'Microservices architecture with API Gateway, Auth Service, User Service, Product Service, Order Service, Message Queue, and PostgreSQL databases' },
+              { label: 'ML Pipeline', prompt: 'Machine Learning pipeline with data ingestion, feature engineering, model training, model registry, A/B testing, and serving infrastructure' },
+            ].map((t) => (
+              <button
+                key={t.label}
+                className="btn btn-template"
+                onClick={() => setPromptText(t.prompt)}
+                disabled={isGenerating}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+
+        <div className="studio-canvas" ref={canvasRef}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges.map(edge => ({
+              ...edge,
+              data: { ...edge.data, previewMode, effectType: edgeEffectType }
+            }))}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={onNodeClick}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            nodesDraggable={true}
+            nodesConnectable={true}
+            fitView
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background variant="dots" color="#1E293B" gap={24} size={2} />
+            <Controls style={{ background: '#0F172A', border: '1px solid rgba(148, 163, 184, 0.15)' }} />
+            <MiniMap nodeColor="#334155" style={{ background: '#0B0F19', border: '1px solid rgba(148, 163, 184, 0.15)' }} />
+          </ReactFlow>
+        </div>
+
+        <div className="studio-sidebar glass-panel">
+          <div className="studio-sidebar-header">
+            <div>
+              <h2 className="sidebar-title">Studio</h2>
+              <p className="sidebar-hint">TikTok 9:16 · 1080×1920</p>
+            </div>
+            <button className="btn btn-ghost" onClick={() => navigate('/flows')}>
+              Flow Manager
+            </button>
+          </div>
+
+          {selectedNodeId && (
+            <div className="selected-indicator">
+              Selected: <strong>{selectedNodeId}</strong>
+            </div>
+          )}
+
+          <div className="tab-nav">
+            <button
+              className={`tab-btn ${activeTab === 'blueprint' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('blueprint')}
+            >
+              🏗️ Blueprint
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'directing' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('directing')}
+            >
+              🎬 Directing
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'fx' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('fx')}
+            >
+              ✨ FX
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'render' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('render')}
+            >
+              🎞️ Render
+            </button>
+          </div>
+
+          {activeTab === 'blueprint' && (
+            <div className="tab-content">
+              <div className="section">
+                <label className="section-label">Flow Metadata</label>
+                <div className="form-field">
+                  <label className="field-label">Flow Name</label>
+                  <input
+                    className="field-input"
+                    value={flowName}
+                    onChange={(e) => setFlowName(e.target.value)}
+                    placeholder="Untitled Flow"
+                  />
+                </div>
+                <div className="form-row">
+                  <button className="btn btn-save" onClick={handleSaveVersion} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Version'}
+                  </button>
+                </div>
+                <div className="form-row">
+                  <button className="btn btn-secondary" onClick={handleExportJson}>
+                    Download Script (.json)
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => importInputRef.current?.click()}
+                  >
+                    Import JSON
+                  </button>
+                  <input
+                    ref={importInputRef}
+                    type="file"
+                    accept="application/json"
+                    style={{ display: 'none' }}
+                    onChange={handleImportJson}
+                  />
+                </div>
+              </div>
+
+              <div className="section">
+                <label className="section-label">Version History</label>
+                {!flowId && (
+                  <p className="empty-hint">Save a version to enable history.</p>
+                )}
+                {flowId && (
+                  <>
+                    <button className="btn btn-secondary" onClick={() => loadVersions(flowId)} style={{ marginBottom: '12px' }}>
+                      Load History
+                    </button>
+                    <div className="version-list-inline">
+                      {versions.length === 0 && (
+                        <p className="empty-hint">No versions yet.</p>
+                      )}
+                      {versions.map((version) => (
+                        <div key={version.id} className="version-item">
+                          <div className="version-meta">
+                            <div className="version-note">
+                              {version.versionNote || 'Untitled update'}
+                            </div>
+                            <div className="version-date">
+                              {new Date(version.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="version-actions">
+                            <button className="btn btn-secondary" onClick={() => handleRollback(version)}>
+                              Rollback
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'directing' && (
+            <div className="tab-content">
+              <div className="section">
+                <label className="section-label">Auto Direct (AI Camera)</label>
+
+                <div className="form-row" style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={previewMode}
+                      onChange={(e) => setPreviewMode(e.target.checked)}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <span style={{ fontSize: '14px' }}>🎬 Sync Edges with Camera</span>
+                  </label>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-field">
+                    <label className="field-label">Hold (frames)</label>
+                    <input className="field-input" type="number" min={10} max={300} value={holdFrames}
+                      onChange={(e) => setHoldFrames(Math.max(10, parseInt(e.target.value || '60', 10)))} />
+                  </div>
+                  <div className="form-field">
+                    <label className="field-label">Pan (frames)</label>
+                    <input className="field-input" type="number" min={5} max={120} value={panFrames}
+                      onChange={(e) => setPanFrames(Math.max(5, parseInt(e.target.value || '30', 10)))} />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-field">
+                    <label className="field-label">Close zoom</label>
+                    <input className="field-input" type="number" step="0.1" min={0.5} max={5} value={zoomClose}
+                      onChange={(e) => setZoomClose(parseFloat(e.target.value || '1.8'))} />
+                  </div>
+                  <div className="form-field">
+                    <label className="field-label">Wide zoom</label>
+                    <input className="field-input" type="number" step="0.1" min={0.1} max={3} value={zoomWide}
+                      onChange={(e) => setZoomWide(parseFloat(e.target.value || '0.5'))} />
+                  </div>
+                </div>
+
+                <button className="btn btn-auto" onClick={handleAutoRirect}>
+                  ✨ Auto Direct (AI Camera)
+                </button>
+              </div>
+
+              <div className="section">
+                <label className="section-label">Add Camera Keyframe</label>
+
+                <div className="form-row">
+                  <div className="form-field">
+                    <label className="field-label">Target Node</label>
+                    <select
+                      className="field-input"
+                      value={kfTargetNodeId}
+                      onChange={(e) => setKfTargetNodeId(e.target.value)}
+                    >
+                      <option value="">— select node —</option>
+                      {selectableNodes.map((n) => (
+                        <option key={n.id} value={n.id}>
+                          {n.data?.title || n.id}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-field">
+                    <label className="field-label">Frame</label>
+                    <input
+                      className="field-input"
+                      type="number"
+                      min={0}
+                      value={kfFrame}
+                      onChange={(e) => setKfFrame(parseInt(e.target.value || '0', 10))}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label className="field-label">Zoom</label>
+                    <input
+                      className="field-input"
+                      type="number"
+                      step="0.1"
+                      min={0.1}
+                      max={5}
+                      value={kfZoom}
+                      onChange={(e) => setKfZoom(parseFloat(e.target.value || '1'))}
+                    />
+                  </div>
+                </div>
+
+                <button className="btn btn-add" onClick={addKeyframe}>
+                  + Add Keyframe
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'fx' && (
+            <div className="tab-content">
+              <div className="section">
+                <label className="section-label">✨ Edge Visual Effects</label>
+
+                <div className="form-field">
+                  <label className="field-label">Effect Type</label>
+                  <select
+                    className="field-input"
+                    value={edgeEffectType}
+                    onChange={(e) => setEdgeEffectType(e.target.value)}
+                    style={{
+                      fontSize: '13px',
+                      padding: '8px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      color: '#fff',
+                      border: '1px solid rgba(148, 163, 184, 0.2)',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    <option value="neon_path">⚡ Neon Path (Microservices)</option>
+                    <option value="particle_blast">💥 Particle Blast (CI/CD)</option>
+                    <option value="stepped_circuit">🔧 Stepped Circuit (Kubernetes)</option>
+                    <option value="ghost_echo">👻 Ghost Echo (Monitoring)</option>
+                    <option value="electric_bolt">⚡ Electric Bolt (Lightning)</option>
+                    <option value="data_packets">📦 Data Packets (Streaming)</option>
+                    <option value="liquid_gradient">🌊 Liquid Gradient (Flow)</option>
+                    <option value="pulse_glow">💓 Pulse Glow (Energy)</option>
+                  </select>
+                </div>
+
+                <div style={{
+                  marginTop: '12px',
+                  padding: '10px',
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  color: 'rgba(255, 255, 255, 0.8)',
+                }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#60a5fa' }}>💡 Effect Suggestions</div>
+                  <table style={{ width: '100%', fontSize: '10px', lineHeight: '1.4' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.2)' }}>
+                        <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Effect</th>
+                        <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Feel</th>
+                        <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Best For</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: '3px 0' }}>⚡ Neon Path</td>
+                        <td style={{ padding: '3px 0' }}>Modern</td>
+                        <td style={{ padding: '3px 0' }}>API Calls</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '3px 0' }}>💥 Particle Blast</td>
+                        <td style={{ padding: '3px 0' }}>Powerful</td>
+                        <td style={{ padding: '3px 0' }}>CI/CD Success</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '3px 0' }}>🔧 Stepped Circuit</td>
+                        <td style={{ padding: '3px 0' }}>Precise</td>
+                        <td style={{ padding: '3px 0' }}>Kubernetes</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '3px 0' }}>👻 Ghost Echo</td>
+                        <td style={{ padding: '3px 0' }}>Smooth</td>
+                        <td style={{ padding: '3px 0' }}>Monitoring</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'render' && (
+            <div className="tab-content">
+              <div className="section">
+                <label className="section-label">Quality Preset</label>
+                <div className="render-presets">
+                  {[
+                    { key: 'draft', label: '⚡ Draft', desc: 'Fastest · 2Mbps' },
+                    { key: 'standard', label: '🎬 Standard', desc: 'Balanced · 8Mbps' },
+                    { key: 'high', label: '💎 High', desc: 'Best quality · 15Mbps' },
+                    { key: 'prores', label: '🎞️ ProRes', desc: 'Editing · Huge file' },
+                  ].map((p) => (
+                    <button
+                      key={p.key}
+                      className={`btn btn-preset ${renderQuality === p.key ? 'btn-preset-active' : ''}`}
+                      onClick={() => setRenderQuality(p.key)}
+                      disabled={loading}
+                    >
+                      <span className="preset-label">{p.label}</span>
+                      <span className="preset-desc">{p.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="section">
+                <label className="section-label">Performance</label>
+                <div className="perf-badges">
+                  <span className="perf-badge">🖥️ GPU Accel</span>
+                  <span className="perf-badge">⚡ HW Encode</span>
+                  <span className="perf-badge">🧵 Multi-thread</span>
+                  <span className="perf-badge">📸 JPEG Frames</span>
+                </div>
+              </div>
+
+              <div className="section export-section">
+                {!loading ? (
+                  <button
+                    className="btn btn-export"
+                    onClick={handleExport}
+                  >
+                    🚀 Export {renderQuality === 'prores' ? 'MOV' : 'MP4'}
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-cancel"
+                    onClick={handleCancelRender}
+                  >
+                    ✕ Cancel Render
+                  </button>
+                )}
+
+                {loading && (
+                  <div className="render-progress-container">
+                    <div className="render-progress-bar">
+                      <div
+                        className="render-progress-fill"
+                        style={{ width: `${renderProgress}%` }}
+                      />
+                    </div>
+                    <div className="render-progress-info">
+                      <span>{renderStatus}</span>
+                      <span>
+                        {renderEta != null ? `ETA ${renderEta}s` : ''}
+                        {renderElapsed != null ? ` · ${renderElapsed}s elapsed` : ''}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {videoUrl && (
+                  <div className="export-result">
+                    <div className="success-msg">
+                      ✨ Render Complete!
+                      {renderElapsed != null && <span className="elapsed-badge"> in {renderElapsed}s</span>}
+                    </div>
+                    <video
+                      src={videoUrl}
+                      controls
+                      autoPlay
+                      width="100%"
+                      style={{ borderRadius: 8, marginTop: 8 }}
+                    />
+                    <a href={videoUrl} download className="download-link">
+                      📥 Download {renderQuality === 'prores' ? 'MOV' : 'MP4'}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="timeline-bottom-bar">
@@ -1021,7 +1135,7 @@ function StudioInner() {
             </button>
           )}
         </div>
-        
+
         {cameraSequence.length === 0 ? (
           <div className="timeline-empty">
             <p className="timeline-empty-hint">Use Auto Direct or add keyframes manually from the Directing tab</p>
@@ -1032,7 +1146,7 @@ function StudioInner() {
               <div key={idx} className="timeline-keyframe-item">
                 <div className="timeline-kf-label">KF {idx + 1}</div>
                 <input className="timeline-kf-input timeline-kf-frame" type="number" min={0} value={kf.frame}
-                  onChange={(e) => updateKeyframe(idx, 'frame', Math.max(0, parseInt(e.target.value || '0', 10)))} 
+                  onChange={(e) => updateKeyframe(idx, 'frame', Math.max(0, parseInt(e.target.value || '0', 10)))}
                   placeholder="Frame" />
                 <select className="timeline-kf-input timeline-kf-target" value={kf.targetNodeId || ''}
                   onChange={(e) => updateKeyframe(idx, 'targetNodeId', e.target.value || undefined)}>
@@ -1042,7 +1156,7 @@ function StudioInner() {
                   ))}
                 </select>
                 <input className="timeline-kf-input timeline-kf-zoom" type="number" step="0.1" min={0.1} max={5} value={kf.zoom}
-                  onChange={(e) => updateKeyframe(idx, 'zoom', parseFloat(e.target.value || '1'))} 
+                  onChange={(e) => updateKeyframe(idx, 'zoom', parseFloat(e.target.value || '1'))}
                   placeholder="Zoom" />
                 <button className="timeline-kf-remove" onClick={() => removeKeyframe(idx)} title="Remove keyframe">✕</button>
               </div>

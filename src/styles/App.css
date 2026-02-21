@@ -480,6 +480,122 @@ body {
   text-decoration: underline;
 }
 
+/* ── Render Presets ── */
+.render-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.btn-preset:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.btn-preset-active {
+  background: rgba(249, 115, 22, 0.15) !important;
+  border-color: rgba(249, 115, 22, 0.4) !important;
+  color: #fdba74 !important;
+}
+
+.preset-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.preset-desc {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* ── Performance Badges ── */
+.perf-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.perf-badge {
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+}
+
+/* ── Progress Bar ── */
+.render-progress-container {
+  margin-top: 12px;
+}
+
+.render-progress-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.render-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f97316, #fb923c, #fbbf24);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.render-progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ── Cancel Button ── */
+.btn-cancel {
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.btn-cancel:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #fecaca;
+}
+
+/* ── Elapsed Badge ── */
+.elapsed-badge {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+  font-size: 12px;
+}
+
 /* ── UniversalNode ── */
 .universal-node {
   background: rgba(20, 20, 30, 0.88);
