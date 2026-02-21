@@ -4,14 +4,13 @@ import {
   ReactFlowProvider,
   Background,
 } from '@xyflow/react';
-import { interpolate, Easing } from 'remotion';
+import { interpolate, Easing, useCurrentFrame } from 'remotion';
 import '@xyflow/react/dist/style.css';
 import UniversalNode from './UniversalNode';
 import ViralEdge from './ViralEdge';
 
 // Register node & edge types outside the component to avoid re-creation
 const nodeTypes = { universal: UniversalNode };
-const edgeTypes = { viral: ViralEdge };
 
 // Default fallback dimensions for nodes when width/height not yet measured
 // Matches typical UniversalNode rendered size
@@ -66,6 +65,8 @@ function DynamicFlowSceneInner({
   width = 1080,
   height = 1920,
   isRemotion = false,
+  edgeEffectType = 'neon_path',
+  previewMode = false,
 }) {
   // ---- 1. Process keyframes: resolve targetNodeId → absolute x/y ----
   const processedKeyframes = useMemo(() => {
@@ -126,14 +127,20 @@ function DynamicFlowSceneInner({
     return { x: kf.x, y: kf.y, zoom: kf.zoom };
   }, [frame, processedKeyframes]);
 
-  // ---- 3. Render ----
+  // ---- 3. Inject current frame, effect type, and preview mode into edges ----
+  // Create edge types wrapper that passes frame and settings to ViralEdge
+  const edgeTypesWithFrame = useMemo(() => ({
+    viral: (props) => <ViralEdge {...props} currentFrame={frame} data={{ ...props.data, effectType: edgeEffectType, previewMode }} />
+  }), [frame, edgeEffectType, previewMode]);
+
+  // ---- 4. Render ----
   return (
     <div style={{ width: '100%', height: '100%', background: '#0B0F19' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
+        edgeTypes={edgeTypesWithFrame}
         viewport={currentViewport}
         // Fully read-only in Remotion context
         panOnDrag={false}

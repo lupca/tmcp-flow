@@ -132,6 +132,31 @@ function generateAutoSequence(currentNodes, currentEdges, opts = {}) {
   return sequence;
 }
 
+/**
+ * Annotate edges with activation timing based on camera sequence.
+ * Each edge activates when the camera focuses on its source node.
+ */
+function annotateEdgesWithTiming(cameraSequence, edges, nodes) {
+  if (!cameraSequence || cameraSequence.length === 0) {
+    // No sequence — all edges active from start
+    return edges.map(edge => ({
+      ...edge,
+      data: { ...edge.data, startFrame: 0 }
+    }));
+  }
+
+  return edges.map(edge => {
+    // Find the keyframe where camera focuses on this edge's source node
+    const sourceKeyframe = cameraSequence.find(kf => kf.targetNodeId === edge.source);
+    const startFrame = sourceKeyframe ? sourceKeyframe.frame : 0;
+
+    return {
+      ...edge,
+      data: { ...edge.data, startFrame }
+    };
+  });
+}
+
 function normalizeNodes(nodes) {
   const mapped = nodes.map((n) => ({
     ...n,
@@ -194,6 +219,8 @@ function StudioInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [cameraSequence, setCameraSequence] = useState([]);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [edgeEffectType, setEdgeEffectType] = useState('neon_path');
 
   const [holdFrames, setHoldFrames] = useState(DEFAULT_HOLD);
   const [panFrames, setPanFrames] = useState(DEFAULT_PAN);
@@ -267,7 +294,14 @@ function StudioInner() {
       zoomWide,
     });
     setCameraSequence(seq);
-  }, [nodes, edges, cameraSequence.length, holdFrames, panFrames, zoomClose, zoomWide]);
+    
+    // Annotate edges with activation timing based on camera sequence
+    const annotatedEdges = annotateEdgesWithTiming(seq, edges, nodes);
+    setEdges(annotatedEdges);
+    
+    // Auto-enable preview mode to see the synchronized animation
+    setPreviewMode(true);
+  }, [nodes, edges, cameraSequence.length, holdFrames, panFrames, zoomClose, zoomWide, setEdges]);
 
   const handleExport = async () => {
     setLoading(true);
@@ -290,6 +324,8 @@ function StudioInner() {
           renderHeight: 1920,
           renderDuration,
           renderFps: 60,
+          edgeEffectType,
+          previewMode,
         }),
       });
 
@@ -631,7 +667,10 @@ function StudioInner() {
       <div className="studio-canvas" ref={canvasRef}>
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={edges.map(edge => ({
+            ...edge,
+            data: { ...edge.data, previewMode, effectType: edgeEffectType }
+          }))}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
@@ -760,7 +799,92 @@ function StudioInner() {
         </div>
 
         <div className="section">
+          <label className="section-label">✨ Edge Visual Effects</label>
+          
+          <div className="form-field">
+            <label className="field-label">Effect Type</label>
+            <select 
+              className="field-input" 
+              value={edgeEffectType} 
+              onChange={(e) => setEdgeEffectType(e.target.value)}
+              style={{ 
+                fontSize: '13px',
+                padding: '8px',
+                background: 'rgba(15, 23, 42, 0.8)',
+                color: '#fff',
+                border: '1px solid rgba(148, 163, 184, 0.2)',
+                borderRadius: '6px',
+              }}
+            >
+              <option value="neon_path">⚡ Neon Path (Microservices)</option>
+              <option value="particle_blast">💥 Particle Blast (CI/CD)</option>
+              <option value="stepped_circuit">🔧 Stepped Circuit (Kubernetes)</option>
+              <option value="ghost_echo">👻 Ghost Echo (Monitoring)</option>
+              <option value="electric_bolt">⚡ Electric Bolt (Lightning)</option>
+              <option value="data_packets">📦 Data Packets (Streaming)</option>
+              <option value="liquid_gradient">🌊 Liquid Gradient (Flow)</option>
+              <option value="pulse_glow">💓 Pulse Glow (Energy)</option>
+            </select>
+          </div>
+
+          <div style={{
+            marginTop: '12px',
+            padding: '10px',
+            background: 'rgba(59, 130, 246, 0.1)',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            borderRadius: '6px',
+            fontSize: '11px',
+            color: 'rgba(255, 255, 255, 0.8)',
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#60a5fa' }}>💡 Effect Suggestions</div>
+            <table style={{ width: '100%', fontSize: '10px', lineHeight: '1.4' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.2)' }}>
+                  <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Effect</th>
+                  <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Feel</th>
+                  <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Best For</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '3px 0' }}>⚡ Neon Path</td>
+                  <td style={{ padding: '3px 0' }}>Modern</td>
+                  <td style={{ padding: '3px 0' }}>API Calls</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '3px 0' }}>💥 Particle Blast</td>
+                  <td style={{ padding: '3px 0' }}>Powerful</td>
+                  <td style={{ padding: '3px 0' }}>CI/CD Success</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '3px 0' }}>🔧 Stepped Circuit</td>
+                  <td style={{ padding: '3px 0' }}>Precise</td>
+                  <td style={{ padding: '3px 0' }}>Kubernetes</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '3px 0' }}>👻 Ghost Echo</td>
+                  <td style={{ padding: '3px 0' }}>Smooth</td>
+                  <td style={{ padding: '3px 0' }}>Monitoring</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="section">
           <label className="section-label">Auto Direct (AI Camera)</label>
+
+          <div className="form-row" style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={previewMode}
+                onChange={(e) => setPreviewMode(e.target.checked)}
+                style={{ width: '18px', height: '18px' }}
+              />
+              <span style={{ fontSize: '14px' }}>🎬 Sync Edges with Camera</span>
+            </label>
+          </div>
 
           <div className="form-row">
             <div className="form-field">

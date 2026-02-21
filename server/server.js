@@ -225,7 +225,10 @@ app.post('/api/render', async (req, res) => {
     const renderHeight = req.body.renderHeight || req.body.height || 1920;
     const renderDuration = req.body.renderDuration || req.body.durationInFrames || 300;
     const renderFps = req.body.renderFps || 60;
+    const edgeEffectType = req.body.edgeEffectType || 'neon_path';
+    const previewMode = req.body.previewMode ?? false;
     console.log(`[Render] Starting: ${renderWidth}x${renderHeight}, ${renderDuration} frames (${(renderDuration / renderFps).toFixed(1)}s @ ${renderFps}fps)`);
+    console.log(`[Render] Edge Effect: ${edgeEffectType}, Preview Mode: ${previewMode}`);
 
     try {
         const scenarios = JSON.parse(fs.readFileSync(SCENARIOS_PATH, 'utf-8'));
@@ -242,6 +245,8 @@ app.post('/api/render', async (req, res) => {
             renderHeight,
             renderDuration,
             renderFps,
+            edgeEffectType,
+            previewMode,
         };
 
         console.log('[Render] Selecting composition...');
