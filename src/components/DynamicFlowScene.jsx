@@ -15,8 +15,8 @@ const edgeTypes = { viral: ViralEdge };
 
 // Default fallback dimensions for nodes when width/height not yet measured
 // Matches typical UniversalNode rendered size
-const DEFAULT_NODE_W = 170;
-const DEFAULT_NODE_H = 80;
+const DEFAULT_NODE_W = 220;
+const DEFAULT_NODE_H = 100;
 
 /**
  * Get node dimensions using React Flow's own priority chain:
@@ -128,7 +128,7 @@ function DynamicFlowSceneInner({
 
   // ---- 3. Render ----
   return (
-    <div style={{ width: '100%', height: '100%', background: '#0a0a0a' }}>
+    <div style={{ width: '100%', height: '100%', background: '#0B0F19' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -146,7 +146,7 @@ function DynamicFlowSceneInner({
         elementsSelectable={false}
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#1a1a1a" gap={20} size={1} />
+        <Background variant="dots" color="#1E293B" gap={24} size={2} />
       </ReactFlow>
     </div>
   );

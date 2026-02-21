@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# AI Server
+ai-server/.venv/
+ai-server/venv/
+ai-server/__pycache__/
+ai-server/*.db
+*.pyc

@@ -11,8 +11,11 @@ import {
 import '@xyflow/react/dist/style.css';
 import UniversalNode from './components/UniversalNode';
 import ViralEdge from './components/ViralEdge';
+import { layoutWithElk } from './utils/elkLayout';
 import './styles/App.css';
 import './styles/index.css';
+
+const AI_API_URL = 'http://localhost:8000';
 
 // ── Node & edge type maps (stable refs, outside component) ──
 const nodeTypes = { universal: UniversalNode };
@@ -29,14 +32,16 @@ const initialNodes = [
     id: 'k3d-cluster', type: 'group', data: { label: 'K3d Cluster' },
     position: { x: 250, y: 450 },
     style: {
-      width: 400, height: 220,
-      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-      border: '1px dashed rgba(255, 255, 255, 0.2)',
-      borderRadius: '16px', color: 'rgba(255, 255, 255, 0.5)', fontWeight: 'bold', padding: '10px',
+      width: 520, height: 260,
+      backgroundColor: 'rgba(30, 41, 59, 0.35)',
+      border: '1px dashed rgba(148, 163, 184, 0.25)',
+      borderRadius: '20px', color: 'rgba(248, 250, 252, 0.6)', fontWeight: 'bold', padding: '16px',
+      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+      boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3)',
     },
   },
-  { id: 'deployment', type: 'universal', data: { title: 'Deployment', subtitle: 'Pods', icon: '🚀' }, position: { x: 30, y: 60 }, parentId: 'k3d-cluster', extent: 'parent' },
-  { id: 'service', type: 'universal', data: { title: 'Service', subtitle: 'LoadBalancer', icon: '🌐' }, position: { x: 220, y: 60 }, parentId: 'k3d-cluster', extent: 'parent' },
+  { id: 'deployment', type: 'universal', data: { title: 'Deployment', subtitle: 'Pods', icon: '🚀' }, position: { x: 40, y: 70 }, parentId: 'k3d-cluster', extent: 'parent' },
+  { id: 'service', type: 'universal', data: { title: 'Service', subtitle: 'LoadBalancer', icon: '🌐' }, position: { x: 280, y: 70 }, parentId: 'k3d-cluster', extent: 'parent' },
   { id: 'user', type: 'universal', data: { title: 'End User', subtitle: '', icon: '👤' }, position: { x: 390, y: 750 } },
 ];
 
@@ -154,6 +159,12 @@ function StudioInner() {
   const [loading, setLoading] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
 
+  // AI Generate state
+  const [promptText, setPromptText] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiStatus, setAiStatus] = useState(null); // { step, message }
+  const [aiError, setAiError] = useState(null);
+
   // When user clicks a node on canvas → auto-fill the keyframe form
   const onNodeClick = useCallback((_event, node) => {
     setSelectedNodeId(node.id);
@@ -253,11 +264,184 @@ function StudioInner() {
     }
   };
 
+  // ── AI Generate Flow handler (SSE) ──
+  const handleGenerateFlow = useCallback(async () => {
+    if (!promptText.trim()) return;
+    setIsGenerating(true);
+    setAiStatus({ step: 'start', message: '🚀 Đang kết nối AI server...' });
+    setAiError(null);
+
+    try {
+      const res = await fetch(`${AI_API_URL}/api/ai/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: promptText }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+
+            if (event.type === 'status') {
+              setAiStatus({ step: event.step, message: event.message });
+            } else if (event.type === 'eval') {
+              // Evaluator feedback — show pass/fail status
+              if (!event.passed) {
+                const issueCount = (event.issues || []).length;
+                setAiStatus({
+                  step: 'eval-retry',
+                  message: `⚠️ Phát hiện ${issueCount} lỗi — đang thử lại...`,
+                });
+              }
+              // If passed, status is already set by the 'status' event
+            } else if (event.type === 'result') {
+              setAiStatus({ step: 'layout', message: '📐 Đang tính toán layout...' });
+
+              // Build React Flow nodes from AI response
+              const groupDefaultStyle = {
+                backgroundColor: 'rgba(30, 41, 59, 0.35)',
+                border: '1px dashed rgba(148, 163, 184, 0.25)',
+                borderRadius: '20px',
+                color: 'rgba(248, 250, 252, 0.6)',
+                fontWeight: 'bold',
+                padding: '16px',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3)',
+              };
+
+              // Group nodes MUST come before their children in the array
+              const sortedNodes = [
+                ...event.nodes.filter((n) => n.type === 'group'),
+                ...event.nodes.filter((n) => n.type !== 'group'),
+              ];
+
+              const rfNodes = sortedNodes.map((n) => ({
+                id: n.id,
+                type: n.type || 'universal',
+                data: n.data || { title: n.id },
+                position: { x: 0, y: 0 }, // placeholder — ELK will compute
+                ...(n.parentId ? { parentId: n.parentId, extent: n.extent || 'parent' } : {}),
+                ...(n.type === 'group'
+                  ? { style: { ...groupDefaultStyle, ...(n.style || {}) } }
+                  : {}),
+              }));
+
+              const rfEdges = event.edges.map((e) => ({
+                id: e.id,
+                source: e.source,
+                target: e.target,
+                type: e.type || 'viral',
+                ...(e.label ? { label: e.label } : {}),
+                ...(e.style ? { style: e.style } : {}),
+              }));
+
+              // Run ELK layout
+              const layoutedNodes = await layoutWithElk(rfNodes, rfEdges);
+
+              setNodes(layoutedNodes);
+              setEdges(rfEdges);
+              setCameraSequence([]); // clear old timeline
+              setAiStatus({ step: 'done', message: '✅ Hoàn thành!' });
+            } else if (event.type === 'error') {
+              setAiError(event.message);
+              setAiStatus(null);
+            }
+          } catch (parseErr) {
+            console.warn('SSE parse error:', parseErr, line);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Generate flow error:', err);
+      setAiError(err.message || 'Không thể kết nối AI server');
+      setAiStatus(null);
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [promptText, setNodes, setEdges, setCameraSequence]);
+
   // Selectable nodes for dropdown (exclude groups)
   const selectableNodes = nodes.filter((n) => n.type !== 'group');
 
   return (
     <div className="studio-layout">
+      {/* ───── Left Sidebar (AI Prompt) ───── */}
+      <div className="studio-sidebar-left glass-panel">
+        <h2 className="sidebar-title">🤖 AI Flow</h2>
+        <p className="sidebar-hint">Mô tả hệ thống, AI sẽ sinh sơ đồ</p>
+
+        <div className="section">
+          <label className="section-label">Prompt</label>
+          <textarea
+            className="field-input prompt-textarea"
+            placeholder="Ví dụ: Hệ thống CI/CD với GitOps, ArgoCD, Docker Registry, K3d cluster..."
+            value={promptText}
+            onChange={(e) => setPromptText(e.target.value)}
+            rows={5}
+            disabled={isGenerating}
+          />
+
+          <button
+            className="btn btn-generate"
+            onClick={handleGenerateFlow}
+            disabled={isGenerating || !promptText.trim()}
+          >
+            {isGenerating ? '⏳ Đang sinh...' : '🚀 Generate Flow'}
+          </button>
+        </div>
+
+        {/* Agent status stream */}
+        {aiStatus && (
+          <div className="ai-status-panel">
+            <div className={`ai-status-dot ${aiStatus.step === 'done' ? 'done' : 'active'}`} />
+            <span className="ai-status-text">{aiStatus.message}</span>
+          </div>
+        )}
+
+        {aiError && (
+          <div className="ai-error-panel">
+            ⚠️ {aiError}
+          </div>
+        )}
+
+        {/* Quick templates */}
+        <div className="section" style={{ marginTop: 'auto' }}>
+          <label className="section-label">Quick Templates</label>
+          {[
+            { label: 'GitOps CI/CD', prompt: 'GitOps CI/CD pipeline with GitHub Actions, Docker Registry, ArgoCD, and Kubernetes cluster with deployments and services' },
+            { label: 'Microservices', prompt: 'Microservices architecture with API Gateway, Auth Service, User Service, Product Service, Order Service, Message Queue, and PostgreSQL databases' },
+            { label: 'ML Pipeline', prompt: 'Machine Learning pipeline with data ingestion, feature engineering, model training, model registry, A/B testing, and serving infrastructure' },
+          ].map((t) => (
+            <button
+              key={t.label}
+              className="btn btn-template"
+              onClick={() => setPromptText(t.prompt)}
+              disabled={isGenerating}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ───── Canvas (main area) ───── */}
       <div className="studio-canvas">
         <ReactFlow
@@ -269,13 +453,13 @@ function StudioInner() {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           nodesDraggable={true}
-          nodesConnectable={false}
+          nodesConnectable={true}
           fitView
           proOptions={{ hideAttribution: true }}
         >
-          <Background color="#1a1a1a" gap={20} size={1} />
-          <Controls style={{ background: '#1a1a1a', border: '1px solid #333' }} />
-          <MiniMap nodeColor="#444" style={{ background: '#0a0a0a', border: '1px solid #333' }} />
+          <Background variant="dots" color="#1E293B" gap={24} size={2} />
+          <Controls style={{ background: '#0F172A', border: '1px solid rgba(148, 163, 184, 0.15)' }} />
+          <MiniMap nodeColor="#334155" style={{ background: '#0B0F19', border: '1px solid rgba(148, 163, 184, 0.15)' }} />
         </ReactFlow>
       </div>
 

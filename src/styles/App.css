@@ -18,7 +18,7 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #0a0a0a;
+  background-color: #0B0F19;
 }
 
 /* ── Studio Layout ── */
@@ -32,7 +32,144 @@ body {
 .studio-canvas {
   flex: 1;
   height: 100%;
-  background: #0a0a0a;
+  background: #0B0F19;
+}
+
+/* ── Left Sidebar (AI Prompt) ── */
+.studio-sidebar-left {
+  width: 300px;
+  min-width: 300px;
+  height: 100%;
+  overflow-y: auto;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(11, 15, 25, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.studio-sidebar-left::-webkit-scrollbar {
+  width: 4px;
+}
+
+.studio-sidebar-left::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.studio-sidebar-left::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+/* ── Prompt Textarea ── */
+.prompt-textarea {
+  resize: vertical;
+  min-height: 80px;
+  max-height: 200px;
+  font-family: inherit;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+/* ── Generate Button ── */
+.btn-generate {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(59, 130, 246, 0.3));
+  color: #7dd3fc;
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  font-size: 15px;
+  padding: 12px 14px;
+}
+
+.btn-generate:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.5), rgba(59, 130, 246, 0.5));
+  color: #bae6fd;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(6, 182, 212, 0.25);
+}
+
+.btn-generate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── AI Status Panel ── */
+.ai-status-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  margin-top: 8px;
+}
+
+.ai-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ai-status-dot.active {
+  background: #06b6d4;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+.ai-status-dot.done {
+  background: #4ade80;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.ai-status-text {
+  font-size: 13px;
+  color: #a5f3fc;
+  line-height: 1.4;
+}
+
+/* ── AI Error Panel ── */
+.ai-error-panel {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  font-size: 13px;
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+/* ── Template Buttons ── */
+.btn-template {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+.btn-template:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.btn-template:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .studio-sidebar {
@@ -45,7 +182,7 @@ body {
   flex-direction: column;
   gap: 4px;
   border-left: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(10, 10, 15, 0.95);
+  background: rgba(11, 15, 25, 0.95);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }

@@ -1,0 +1,13 @@
+[project]
+name = "ai-server"
+version = "0.1.0"
+description = "TikTok Flow Studio — AI Backend (FastAPI + LangGraph)"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "sqlmodel>=0.0.22",
+    "langchain-ollama>=0.3.0",
+    "langgraph>=0.2.0",
+    "pydantic>=2.10.0",
+]

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:full": "concurrently \"npm run dev\" \"node server/server.js\"",
+    "dev:ai": "cd ai-server && uv run uvicorn main:app --reload --port 8000",
+    "dev:full": "concurrently \"npm run dev\" \"node server/server.js\" \"npm run dev:ai\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -16,6 +17,7 @@
     "@xyflow/react": "^12.10.0",
     "concurrently": "^9.2.1",
     "cors": "^2.8.6",
+    "elkjs": "^0.11.0",
     "express": "^5.2.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

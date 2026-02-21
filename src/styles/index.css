@@ -5,7 +5,7 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #1a1a1a;
+  background-color: #0B0F19;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -19,7 +19,7 @@ body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: radial-gradient(circle at center, #2a2a2a 0%, #1a1a1a 100%);
+  background: radial-gradient(circle at center, #131B2E 0%, #0B0F19 100%);
 }
 
 /* Viral Animations */
