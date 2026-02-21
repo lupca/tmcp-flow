@@ -93,38 +93,74 @@ function DynamicFlowSceneInner({
               zoom,
               x: (width / 2) - (centerX * zoom),
               y: (height / 2) - (centerY * zoom),
+              easing: kf.easing,
             };
           }
-          return { frame: kf.frame, zoom: kf.zoom || 1, x: 0, y: 0 };
+          return { frame: kf.frame, zoom: kf.zoom || 1, x: 0, y: 0, easing: kf.easing };
         }
         return {
           frame: kf.frame,
           zoom: kf.zoom || 1,
           x: kf.x ?? 0,
           y: kf.y ?? 0,
+          easing: kf.easing,
         };
       })
       .sort((a, b) => a.frame - b.frame);
   }, [cameraSequence, nodes, width, height]);
 
-  // ---- 2. Interpolate viewport for the current frame ----
+  // ---- 2. Interpolate viewport with per-segment easing ----
   const currentViewport = useMemo(() => {
-    if (processedKeyframes.length >= 2) {
-      const inputFrames = processedKeyframes.map((k) => k.frame);
-      const opts = {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-        easing: Easing.inOut(Easing.ease),
-      };
-      return {
-        x: interpolate(frame, inputFrames, processedKeyframes.map((k) => k.x), opts),
-        y: interpolate(frame, inputFrames, processedKeyframes.map((k) => k.y), opts),
-        zoom: interpolate(frame, inputFrames, processedKeyframes.map((k) => k.zoom), opts),
-      };
+    if (processedKeyframes.length < 2) {
+      const kf = processedKeyframes[0];
+      return { x: kf.x, y: kf.y, zoom: kf.zoom };
     }
-    // Single or no keyframe — static viewport
-    const kf = processedKeyframes[0];
-    return { x: kf.x, y: kf.y, zoom: kf.zoom };
+
+    // Find the current segment (pair of keyframes we're between)
+    const kfs = processedKeyframes;
+    let segIdx = 0;
+    for (let i = 0; i < kfs.length - 1; i++) {
+      if (frame >= kfs[i].frame && frame <= kfs[i + 1].frame) {
+        segIdx = i;
+        break;
+      }
+      if (frame > kfs[i + 1].frame) segIdx = i + 1;
+    }
+    // Clamp to valid range
+    segIdx = Math.min(segIdx, kfs.length - 2);
+
+    const from = kfs[segIdx];
+    const to = kfs[segIdx + 1];
+    const segDuration = to.frame - from.frame;
+
+    if (segDuration <= 0) {
+      return { x: to.x, y: to.y, zoom: to.zoom };
+    }
+
+    // Pick easing based on the TARGET keyframe's easing field
+    const easingName = to.easing || 'smooth';
+    let easingFn;
+    switch (easingName) {
+      case 'slow':
+        easingFn = Easing.inOut(Easing.cubic);
+        break;
+      case 'snap':
+        easingFn = Easing.out(Easing.ease);
+        break;
+      case 'smooth':
+      default:
+        easingFn = Easing.inOut(Easing.ease);
+        break;
+    }
+
+    const localProgress = Math.max(0, Math.min(1, (frame - from.frame) / segDuration));
+    const eased = easingFn(localProgress);
+
+    return {
+      x: from.x + (to.x - from.x) * eased,
+      y: from.y + (to.y - from.y) * eased,
+      zoom: from.zoom + (to.zoom - from.zoom) * eased,
+    };
   }, [frame, processedKeyframes]);
 
   // ---- 3. Inject current frame, effect type, and preview mode into edges ----
