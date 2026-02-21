@@ -9,383 +9,19 @@ import {
   useEdgesState,
 } from '@xyflow/react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { toPng } from 'html-to-image';
 import '@xyflow/react/dist/style.css';
 import UniversalNode from '../components/UniversalNode';
 import ViralEdge from '../components/ViralEdge';
 import { layoutWithElk } from '../utils/elkLayout';
+import { initialNodes, initialEdges, groupDefaultStyle } from '../constants/flowConstants';
+import { generateAutoSequence, annotateEdgesWithTiming } from '../utils/autoDirect';
+import { ensureLayout } from '../utils/flowUtils';
+import { captureThumbnail, downloadJson } from '../utils/exportUtils';
 
 const AI_API_URL = 'http://localhost:8000';
 
 const nodeTypes = { universal: UniversalNode };
 const edgeTypes = { viral: ViralEdge };
-
-const initialNodes = [
-  { id: 'source-code', type: 'universal', data: { title: 'Source Code', subtitle: 'Commit & Push', icon: '📝' }, position: { x: 50, y: 50 } },
-  { id: 'ci-pipeline', type: 'universal', data: { title: 'CI Pipeline', subtitle: 'Build & Test', icon: '⚙️' }, position: { x: 50, y: 200 } },
-  { id: 'docker-registry', type: 'universal', data: { title: 'Docker Registry', subtitle: 'Store Image', icon: '📦' }, position: { x: 300, y: 200 } },
-  { id: 'gitops-repo', type: 'universal', data: { title: 'GitOps Repo', subtitle: 'Manifests', icon: '📜' }, position: { x: 550, y: 200 } },
-  { id: 'argocd', type: 'universal', data: { title: 'Argo CD', subtitle: 'Sync Controller', icon: '🐙' }, position: { x: 550, y: 350 } },
-  {
-    id: 'k3d-cluster', type: 'group', data: { label: 'K3d Cluster' },
-    position: { x: 250, y: 450 },
-    style: {
-      width: 520, height: 260,
-      backgroundColor: 'rgba(30, 41, 59, 0.35)',
-      border: '1px dashed rgba(148, 163, 184, 0.25)',
-      borderRadius: '20px', color: 'rgba(248, 250, 252, 0.6)', fontWeight: 'bold', padding: '16px',
-      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-      boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3)',
-    },
-  },
-  { id: 'deployment', type: 'universal', data: { title: 'Deployment', subtitle: 'Pods', icon: '🚀' }, position: { x: 40, y: 70 }, parentId: 'k3d-cluster', extent: 'parent' },
-  { id: 'service', type: 'universal', data: { title: 'Service', subtitle: 'LoadBalancer', icon: '🌐' }, position: { x: 280, y: 70 }, parentId: 'k3d-cluster', extent: 'parent' },
-  { id: 'user', type: 'universal', data: { title: 'End User', subtitle: '', icon: '👤' }, position: { x: 390, y: 750 } },
-];
-
-const initialEdges = [
-  { id: 'e1', source: 'source-code', target: 'ci-pipeline', type: 'viral', label: 'Push Code', style: { stroke: '#f97316' } },
-  { id: 'e2', source: 'ci-pipeline', target: 'docker-registry', type: 'viral', label: 'Push Image', style: { stroke: '#8b5cf6' } },
-  { id: 'e3', source: 'ci-pipeline', target: 'gitops-repo', type: 'viral', label: 'Update Tag', style: { stroke: '#8b5cf6' } },
-  { id: 'e4', source: 'gitops-repo', target: 'argocd', type: 'viral', label: 'Watch', style: { stroke: '#f97316' } },
-  { id: 'e5', source: 'argocd', target: 'deployment', type: 'viral', label: 'Sync', style: { stroke: '#06b6d4' } },
-  { id: 'e6', source: 'docker-registry', target: 'deployment', type: 'viral', label: 'Pull Image', style: { stroke: '#a855f7' } },
-  { id: 'e7', source: 'deployment', target: 'service', type: 'viral', style: { stroke: '#10b981' } },
-  { id: 'e8', source: 'service', target: 'user', type: 'viral', label: 'Access', style: { stroke: '#ec4899' } },
-];
-
-const DEFAULT_HOLD = 60;
-const DEFAULT_PAN = 30;
-const DEFAULT_ZOOM_CLOSE = 1.8;
-const DEFAULT_ZOOM_WIDE = 0.5;
-
-const groupDefaultStyle = {
-  backgroundColor: 'rgba(30, 41, 59, 0.35)',
-  border: '1px dashed rgba(148, 163, 184, 0.25)',
-  borderRadius: '20px',
-  color: 'rgba(248, 250, 252, 0.6)',
-  fontWeight: 'bold',
-  padding: '16px',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
-  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3)',
-};
-
-// ── Cinematic Auto Direct Helpers ────────────────────────────────────
-
-const DEFAULT_NODE_W = 220;
-const DEFAULT_NODE_H = 100;
-
-function _getNodeW(node) {
-  return node.measured?.width ?? node.width ?? node.initialWidth ?? node.style?.width ?? DEFAULT_NODE_W;
-}
-function _getNodeH(node) {
-  return node.measured?.height ?? node.height ?? node.initialHeight ?? node.style?.height ?? DEFAULT_NODE_H;
-}
-
-/** Resolve absolute position (handles child nodes inside groups) */
-function _getAbsPos(node, allNodes) {
-  let x = node.position?.x ?? 0;
-  let y = node.position?.y ?? 0;
-  if (node.parentId) {
-    const parent = allNodes.find((n) => n.id === node.parentId);
-    if (parent) {
-      const pp = _getAbsPos(parent, allNodes);
-      x += pp.x;
-      y += pp.y;
-    }
-  }
-  return { x, y };
-}
-
-/** Center point of a node in absolute coords */
-function _nodeCenter(node, allNodes) {
-  const abs = _getAbsPos(node, allNodes);
-  return { x: abs.x + _getNodeW(node) / 2, y: abs.y + _getNodeH(node) / 2 };
-}
-
-/** Euclidean distance between two nodes */
-function _dist(a, b, allNodes) {
-  const ca = _nodeCenter(a, allNodes);
-  const cb = _nodeCenter(b, allNodes);
-  return Math.sqrt((ca.x - cb.x) ** 2 + (ca.y - cb.y) ** 2);
-}
-
-/** Bounding box that fits all given nodes */
-function _fitAllBounds(nodes, allNodes) {
-  if (!nodes.length) return { cx: 0, cy: 0, zoom: 0.5 };
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const n of nodes) {
-    const abs = _getAbsPos(n, allNodes);
-    const w = _getNodeW(n);
-    const h = _getNodeH(n);
-    if (abs.x < minX) minX = abs.x;
-    if (abs.y < minY) minY = abs.y;
-    if (abs.x + w > maxX) maxX = abs.x + w;
-    if (abs.y + h > maxY) maxY = abs.y + h;
-  }
-  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, spanX: maxX - minX, spanY: maxY - minY };
-}
-
-/** Calculate zoom that fits a bounding span into 1080x1920 with padding */
-function _fitZoom(spanX, spanY, padding = 200) {
-  const targetW = 1080 - padding * 2;
-  const targetH = 1920 - padding * 2;
-  const zx = spanX > 0 ? targetW / spanX : 2;
-  const zy = spanY > 0 ? targetH / spanY : 2;
-  return Math.min(zx, zy, 1.2); // cap at 1.2 to avoid over-zoom
-}
-
-/** Count neighbor connections of a node */
-function _neighborCount(nodeId, edges) {
-  return edges.filter((e) => e.source === nodeId || e.target === nodeId).length;
-}
-
-/**
- * Cinematic Auto Direct — generates a professional camera sequence.
- *
- * Structure:
- *   1. Establishing shot (fit-all overview)
- *   2. DFS traversal following edge flow (source→target)
- *      - Group cluster overview when entering a new group
- *      - Dynamic zoom based on neighbor density
- *      - Adaptive pan timing based on Euclidean distance
- *   3. Outro shot (zoom back out to fit-all)
- */
-function generateAutoSequence(currentNodes, currentEdges, opts = {}) {
-  const {
-    holdFrames = DEFAULT_HOLD,
-    panFrames = DEFAULT_PAN,
-    zoomClose = DEFAULT_ZOOM_CLOSE,
-    zoomWide = DEFAULT_ZOOM_WIDE,
-  } = opts;
-
-  const allNodes = currentNodes;
-  const nonGroupNodes = allNodes.filter((n) => n.type !== 'group');
-  const groupNodes = allNodes.filter((n) => n.type === 'group');
-  if (nonGroupNodes.length === 0) return [];
-
-  // ── Build adjacency (outgoing edges per node) ──
-  const outgoing = {};
-  for (const e of currentEdges) {
-    if (!outgoing[e.source]) outgoing[e.source] = [];
-    outgoing[e.source].push(e.target);
-  }
-
-  // ── Find root nodes (no incoming edges) ──
-  const targetIds = new Set(currentEdges.map((e) => e.target));
-  let roots = nonGroupNodes.filter((n) => !targetIds.has(n.id));
-  if (roots.length === 0) roots = [nonGroupNodes[0]];
-
-  // ── DFS traversal following edge flow ──
-  // Prioritize longest-path branches first for dramatic storytelling
-  const visited = new Set();
-  const ordered = [];
-
-  function dfs(nodeId) {
-    if (visited.has(nodeId)) return;
-    visited.add(nodeId);
-    const node = allNodes.find((n) => n.id === nodeId);
-    if (node && node.type !== 'group') ordered.push(node);
-    // Sort children: nodes with more descendants first (longest path priority)
-    const children = (outgoing[nodeId] || []).filter((id) => !visited.has(id));
-    // Simple heuristic: sort by sub-graph size (deeper branches first)
-    children.sort((a, b) => {
-      const depthA = _countDescendants(a, outgoing, new Set([...visited]));
-      const depthB = _countDescendants(b, outgoing, new Set([...visited]));
-      return depthB - depthA;
-    });
-    for (const childId of children) {
-      dfs(childId);
-    }
-  }
-
-  for (const root of roots) dfs(root.id);
-
-  // Add any unvisited nodes
-  for (const n of nonGroupNodes) {
-    if (!visited.has(n.id)) ordered.push(n);
-  }
-
-  if (ordered.length === 0) return [];
-
-  // ── Generate cinematic keyframe sequence ──
-  const sequence = [];
-  let frame = 0;
-
-  // ── 1. ESTABLISHING SHOT — fit-all overview ──
-  const bounds = _fitAllBounds(nonGroupNodes, allNodes);
-  const fitZoom = _fitZoom(bounds.spanX, bounds.spanY);
-  // Use manual x/y coords for fit-all (center of all nodes)
-  const estX = (1080 / 2) - (bounds.cx * fitZoom);
-  const estY = (1920 / 2) - (bounds.cy * fitZoom);
-  sequence.push({ frame, x: estX, y: estY, zoom: Math.max(fitZoom, 0.25), easing: 'smooth' });
-  frame += Math.round(holdFrames * 2); // Hold establishing shot longer (2x)
-
-  // ── 2. NODE-BY-NODE TRAVERSAL ──
-  const visitedGroups = new Set();
-  let prevNode = null;
-
-  for (let i = 0; i < ordered.length; i++) {
-    const node = ordered[i];
-
-    // ─ Group cluster overview when entering a new group ─
-    if (node.parentId && !visitedGroups.has(node.parentId)) {
-      visitedGroups.add(node.parentId);
-      const groupNode = groupNodes.find((g) => g.id === node.parentId);
-      if (groupNode) {
-        const groupChildren = nonGroupNodes.filter((n) => n.parentId === node.parentId);
-        if (groupChildren.length > 1) {
-          // Adaptive pan to group
-          if (prevNode) {
-            const distToGroup = _dist(prevNode, groupChildren[0], allNodes);
-            const adaptivePan = _clampPan(distToGroup, panFrames);
-            frame += adaptivePan;
-          }
-          // Cluster overview: fit all children within the group
-          const gBounds = _fitAllBounds(groupChildren, allNodes);
-          const gZoom = _fitZoom(gBounds.spanX, gBounds.spanY, 160);
-          const gx = (1080 / 2) - (gBounds.cx * gZoom);
-          const gy = (1920 / 2) - (gBounds.cy * gZoom);
-          sequence.push({ frame, x: gx, y: gy, zoom: Math.min(gZoom, 1.4), easing: 'slow' });
-          frame += Math.round(holdFrames * 1.2); // Hold cluster shot slightly longer
-        }
-      }
-    }
-
-    // ─ Adaptive pan timing based on distance ─
-    if (prevNode) {
-      const d = _dist(prevNode, node, allNodes);
-      const adaptivePan = _clampPan(d, panFrames);
-      frame += adaptivePan;
-    }
-
-    // ─ Dynamic zoom based on neighbor density ─
-    const neighbors = _neighborCount(node.id, currentEdges);
-    let nodeZoom;
-    if (neighbors <= 1) {
-      // Isolated leaf → zoom deeper for emphasis
-      nodeZoom = Math.min(zoomClose * 1.2, 2.5);
-    } else if (neighbors >= 4) {
-      // Hub node with many connections → zoom out to show context
-      nodeZoom = Math.max(zoomClose * 0.75, 1.2);
-    } else {
-      nodeZoom = zoomClose;
-    }
-
-    sequence.push({ frame, targetNodeId: node.id, zoom: nodeZoom, easing: 'smooth' });
-    frame += holdFrames;
-    prevNode = node;
-  }
-
-  // ── 3. OUTRO SHOT — zoom back out to overview ──
-  frame += Math.round(panFrames * 1.5);
-  sequence.push({ frame, x: estX, y: estY, zoom: Math.max(fitZoom, 0.25), easing: 'slow' });
-  frame += Math.round(holdFrames * 1.5);
-
-  return sequence;
-}
-
-/** Count descendants reachable from nodeId (for DFS branch prioritization) */
-function _countDescendants(nodeId, outgoing, visited) {
-  if (visited.has(nodeId)) return 0;
-  visited.add(nodeId);
-  let count = 1;
-  for (const child of (outgoing[nodeId] || [])) {
-    count += _countDescendants(child, outgoing, visited);
-  }
-  return count;
-}
-
-/** Adaptive pan frames: scale linearly with distance, clamped to [18, 72] */
-function _clampPan(distance, basePan) {
-  // Base reference: 300px distance maps to basePan frames
-  const scaled = Math.round(basePan * (distance / 300));
-  return Math.max(18, Math.min(72, scaled));
-}
-
-/**
- * Annotate edges with activation timing based on camera sequence.
- * Each edge activates when the camera focuses on its source node.
- */
-function annotateEdgesWithTiming(cameraSequence, edges, nodes) {
-  if (!cameraSequence || cameraSequence.length === 0) {
-    // No sequence — all edges active from start
-    return edges.map(edge => ({
-      ...edge,
-      data: { ...edge.data, startFrame: 0 }
-    }));
-  }
-
-  return edges.map(edge => {
-    // Find the keyframe where camera focuses on this edge's source node
-    const sourceKeyframe = cameraSequence.find(kf => kf.targetNodeId === edge.source);
-    const startFrame = sourceKeyframe ? sourceKeyframe.frame : 0;
-
-    return {
-      ...edge,
-      data: { ...edge.data, startFrame }
-    };
-  });
-}
-
-function normalizeNodes(nodes) {
-  const mapped = nodes.map((n) => ({
-    ...n,
-    type: n.type || 'universal',
-    data: n.data || { title: n.id },
-    ...(n.type === 'group'
-      ? { style: { ...groupDefaultStyle, ...(n.style || {}) } }
-      : {}),
-  }));
-
-  return [
-    ...mapped.filter((n) => n.type === 'group'),
-    ...mapped.filter((n) => n.type !== 'group'),
-  ];
-}
-
-function shouldRelayout(nodes) {
-  return nodes.some(
-    (node) =>
-      !node.position ||
-      typeof node.position.x !== 'number' ||
-      typeof node.position.y !== 'number'
-  );
-}
-
-async function ensureLayout(nodes, edges) {
-  const normalized = normalizeNodes(nodes);
-  if (normalized.length === 0) return normalized;
-  if (!shouldRelayout(normalized)) return normalized;
-  return layoutWithElk(normalized, edges);
-}
-
-async function captureThumbnail(containerRef) {
-  const target = containerRef.current?.querySelector('.react-flow');
-  if (!target) return null;
-
-  try {
-    return await toPng(target, {
-      cacheBust: true,
-      backgroundColor: '#0B0F19',
-      pixelRatio: 0.6,
-    });
-  } catch (error) {
-    console.warn('Thumbnail capture failed:', error);
-    return null;
-  }
-}
-
-function downloadJson(filename, payload) {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
 
 function StudioInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -394,10 +30,7 @@ function StudioInner() {
   const [previewMode, setPreviewMode] = useState(false);
   const [edgeEffectType, setEdgeEffectType] = useState('neon_path');
 
-  const [holdFrames, setHoldFrames] = useState(DEFAULT_HOLD);
-  const [panFrames, setPanFrames] = useState(DEFAULT_PAN);
-  const [zoomClose, setZoomClose] = useState(DEFAULT_ZOOM_CLOSE);
-  const [zoomWide, setZoomWide] = useState(DEFAULT_ZOOM_WIDE);
+
 
   const [kfFrame, setKfFrame] = useState(0);
   const [kfZoom, setKfZoom] = useState(1.5);
@@ -464,12 +97,7 @@ function StudioInner() {
     ) {
       return;
     }
-    const seq = generateAutoSequence(nodes, edges, {
-      holdFrames,
-      panFrames,
-      zoomClose,
-      zoomWide,
-    });
+    const seq = generateAutoSequence(nodes, edges);
     setCameraSequence(seq);
 
     // Annotate edges with activation timing based on camera sequence
@@ -478,7 +106,7 @@ function StudioInner() {
 
     // Auto-enable preview mode to see the synchronized animation
     setPreviewMode(true);
-  }, [nodes, edges, cameraSequence.length, holdFrames, panFrames, zoomClose, zoomWide, setEdges]);
+  }, [nodes, edges, cameraSequence.length, setEdges]);
 
   const handleExport = async () => {
     setLoading(true);
@@ -1039,31 +667,7 @@ function StudioInner() {
                   </label>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-field">
-                    <label className="field-label">Hold (frames)</label>
-                    <input className="field-input" type="number" min={10} max={300} value={holdFrames}
-                      onChange={(e) => setHoldFrames(Math.max(10, parseInt(e.target.value || '60', 10)))} />
-                  </div>
-                  <div className="form-field">
-                    <label className="field-label">Pan (frames)</label>
-                    <input className="field-input" type="number" min={5} max={120} value={panFrames}
-                      onChange={(e) => setPanFrames(Math.max(5, parseInt(e.target.value || '30', 10)))} />
-                  </div>
-                </div>
 
-                <div className="form-row">
-                  <div className="form-field">
-                    <label className="field-label">Close zoom</label>
-                    <input className="field-input" type="number" step="0.1" min={0.5} max={5} value={zoomClose}
-                      onChange={(e) => setZoomClose(parseFloat(e.target.value || '1.8'))} />
-                  </div>
-                  <div className="form-field">
-                    <label className="field-label">Wide zoom</label>
-                    <input className="field-input" type="number" step="0.1" min={0.1} max={3} value={zoomWide}
-                      onChange={(e) => setZoomWide(parseFloat(e.target.value || '0.5'))} />
-                  </div>
-                </div>
 
                 <button className="btn btn-auto" onClick={handleAutoRirect}>
                   ✨ Auto Direct (AI Camera)
@@ -1316,21 +920,36 @@ function StudioInner() {
           <div className="timeline-track">
             {cameraSequence.map((kf, idx) => (
               <div key={idx} className="timeline-keyframe-item">
-                <div className="timeline-kf-label">KF {idx + 1}</div>
-                <input className="timeline-kf-input timeline-kf-frame" type="number" min={0} value={kf.frame}
-                  onChange={(e) => updateKeyframe(idx, 'frame', Math.max(0, parseInt(e.target.value || '0', 10)))}
-                  placeholder="Frame" />
-                <select className="timeline-kf-input timeline-kf-target" value={kf.targetNodeId || ''}
-                  onChange={(e) => updateKeyframe(idx, 'targetNodeId', e.target.value || undefined)}>
-                  <option value="">manual</option>
-                  {selectableNodes.map((n) => (
-                    <option key={n.id} value={n.id}>{n.data?.title || n.id}</option>
-                  ))}
-                </select>
-                <input className="timeline-kf-input timeline-kf-zoom" type="number" step="0.1" min={0.1} max={5} value={kf.zoom}
-                  onChange={(e) => updateKeyframe(idx, 'zoom', parseFloat(e.target.value || '1'))}
-                  placeholder="Zoom" />
-                <button className="timeline-kf-remove" onClick={() => removeKeyframe(idx)} title="Remove keyframe">✕</button>
+                <div className="timeline-kf-header">
+                  <div className="timeline-kf-label">KF {idx + 1}</div>
+                  <button className="timeline-kf-remove" onClick={() => removeKeyframe(idx)} title="Remove keyframe">✕</button>
+                </div>
+
+                <div className="timeline-kf-row">
+                  <span className="timeline-kf-field-label">Frame</span>
+                  <input className="timeline-kf-input timeline-kf-frame" type="number" min={0} value={kf.frame}
+                    onChange={(e) => updateKeyframe(idx, 'frame', Math.max(0, parseInt(e.target.value || '0', 10)))}
+                    title="Frame" />
+                </div>
+
+                <div className="timeline-kf-row">
+                  <span className="timeline-kf-field-label">Target</span>
+                  <select className="timeline-kf-input timeline-kf-target" value={kf.targetNodeId || ''}
+                    onChange={(e) => updateKeyframe(idx, 'targetNodeId', e.target.value || undefined)}
+                    title="Target Node">
+                    <option value="">manual</option>
+                    {selectableNodes.map((n) => (
+                      <option key={n.id} value={n.id}>{n.data?.title || n.id}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="timeline-kf-row">
+                  <span className="timeline-kf-field-label">Zoom</span>
+                  <input className="timeline-kf-input timeline-kf-zoom" type="number" step="0.1" min={0.1} max={5} value={kf.zoom}
+                    onChange={(e) => updateKeyframe(idx, 'zoom', parseFloat(e.target.value || '1'))}
+                    title="Zoom" />
+                </div>
               </div>
             ))}
           </div>
