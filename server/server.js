@@ -37,8 +37,12 @@ app.get('/api/health', (req, res) => {
 app.post('/api/render', async (req, res) => {
     if (!bundleLocation) return res.status(503).json({ error: 'Server is still bundling. Please wait and try again.' });
 
-    const { nodes, edges, width, height, durationInFrames, config } = req.body;
-    console.log(`[Render] Starting: ${width}x${height}, ${durationInFrames} frames`);
+    const { nodes, edges, config } = req.body;
+    const renderWidth = req.body.renderWidth || req.body.width || 1080;
+    const renderHeight = req.body.renderHeight || req.body.height || 1920;
+    const renderDuration = req.body.renderDuration || req.body.durationInFrames || 300;
+    const renderFps = req.body.renderFps || 60;
+    console.log(`[Render] Starting: ${renderWidth}x${renderHeight}, ${renderDuration} frames (${(renderDuration / renderFps).toFixed(1)}s @ ${renderFps}fps)`);
 
     try {
         const scenarios = JSON.parse(fs.readFileSync(SCENARIOS_PATH, 'utf-8'));
@@ -50,23 +54,19 @@ app.post('/api/render', async (req, res) => {
             nodes: nodes || scenario.nodes,
             edges: edges || scenario.edges,
             config: config || scenario.config,
-            // prefer cameraSequence sent from the client, otherwise fall back to scenario
             cameraSequence: req.body.cameraSequence ?? scenario.cameraSequence,
-            renderWidth: width || 1280,
-            renderHeight: height || 720,
-            renderDuration: durationInFrames || 300,
-            renderFps: 60,
+            renderWidth,
+            renderHeight,
+            renderDuration,
+            renderFps,
         };
 
         console.log('[Render] Selecting composition...');
-        const composition = await selectComposition({ serveUrl: bundleLocation, id: 'ArgoK3dFlow', inputProps });
+        const composition = await selectComposition({ serveUrl: bundleLocation, id: 'DynamicFlowScene', inputProps });
 
         console.log('[Render] Rendering media...');
         await renderMedia({
-            composition: {
-                ...composition,
-                durationInFrames: durationInFrames || 300,
-            },
+            composition,
             serveUrl: bundleLocation,
             codec: 'h264',
             outputLocation: outputPath,

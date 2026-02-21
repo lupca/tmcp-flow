@@ -34,7 +34,7 @@ async function main() {
     // 1. Bundle the project
     console.log('Bundling project...');
     const bundleLocation = await bundle({
-        entryPoint: path.resolve('src/RemotionRoot.jsx'),
+        entryPoint: path.resolve('src/remotion/RemotionRoot.jsx'),
         // Optional: webpack override or additional config if needed
         // webpackOverride: (config) => config,
     });
@@ -63,7 +63,7 @@ async function main() {
         // Select composition to get detailed props (width, height, fps etc)
         const composition = await selectComposition({
             serveUrl: bundleLocation,
-            id: 'ArgoK3dFlow',
+            id: 'DynamicFlowScene',
             inputProps,
         });
 

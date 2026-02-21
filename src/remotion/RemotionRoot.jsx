@@ -1,14 +1,19 @@
 import React from 'react';
 import { Composition, registerRoot, useCurrentFrame, useVideoConfig } from 'remotion';
-import ArgoK3dFlow from '../components/ArgoK3dFlow';
+import DynamicFlowScene from '../components/DynamicFlowScene';
 
-// Wrapper to provide Remotion context to the presentation component
-const ArgoK3dFlowRemotion = (props) => {
+// Import global CSS so Remotion's Webpack bundler includes them in the render
+import '@xyflow/react/dist/style.css';
+import '../styles/index.css';
+import '../styles/App.css';
+
+// Wrapper to inject Remotion frame & video config into the presentation component
+const DynamicFlowSceneRemotion = (props) => {
     const frame = useCurrentFrame();
     const { width, height } = useVideoConfig();
 
     return (
-        <ArgoK3dFlow
+        <DynamicFlowScene
             {...props}
             frame={frame}
             width={width}
@@ -22,20 +27,24 @@ export const RemotionRoot = () => {
     return (
         <>
             <Composition
-                id="ArgoK3dFlow"
-                component={ArgoK3dFlowRemotion}
+                id="DynamicFlowScene"
+                component={DynamicFlowSceneRemotion}
                 durationInFrames={300}
                 fps={60}
-                width={1280}
-                height={720}
+                width={1080}
+                height={1920}
                 calculateMetadata={async ({ props }) => {
                     return {
-                        // Allow overriding via inputProps
-                        width: props?.renderWidth || 1280,
-                        height: props?.renderHeight || 720,
+                        width: props?.renderWidth || 1080,
+                        height: props?.renderHeight || 1920,
                         durationInFrames: props?.renderDuration || 300,
                         fps: props?.renderFps || 60,
                     };
+                }}
+                defaultProps={{
+                    nodes: [],
+                    edges: [],
+                    cameraSequence: [],
                 }}
             />
         </>
