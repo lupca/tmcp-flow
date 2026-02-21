@@ -243,8 +243,8 @@ function StudioInner() {
   const [flowId, setFlowId] = useState(null);
   const [flowName, setFlowName] = useState('');
   const [versions, setVersions] = useState([]);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('blueprint');
 
   const canvasRef = useRef(null);
   const importInputRef = useRef(null);
@@ -389,14 +389,6 @@ function StudioInner() {
     }
   }, [searchParams, loadFlow]);
 
-  useEffect(() => {
-    if (isHistoryOpen && flowId && versions.length === 0) {
-      loadVersions(flowId).catch((error) => {
-        console.warn('Failed to load versions:', error);
-      });
-    }
-  }, [isHistoryOpen, flowId, versions.length, loadVersions]);
-
   const handleSaveVersion = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -448,9 +440,6 @@ function StudioInner() {
       }
 
       await loadVersions(currentFlowId);
-      if (!isHistoryOpen) {
-        setIsHistoryOpen(true);
-      }
       alert('Saved version.');
     } catch (error) {
       console.error('Save version error:', error);
@@ -608,6 +597,7 @@ function StudioInner() {
 
   return (
     <div className="studio-layout">
+      <div className="studio-main">
       <div className="studio-sidebar-left glass-panel">
         <h2 className="sidebar-title">🤖 AI Flow</h2>
         <p className="sidebar-hint">Mô tả hệ thống, AI sẽ sinh sơ đồ</p>
@@ -698,57 +688,165 @@ function StudioInner() {
           </button>
         </div>
 
-        <div className="section">
-          <label className="section-label">Flow Metadata</label>
-          <div className="form-field">
-            <label className="field-label">Flow Name</label>
-            <input
-              className="field-input"
-              value={flowName}
-              onChange={(e) => setFlowName(e.target.value)}
-              placeholder="Untitled Flow"
-            />
-          </div>
-          <div className="form-row">
-            <button className="btn btn-save" onClick={handleSaveVersion} disabled={isSaving}>
-              {isSaving ? 'Saving...' : 'Save Version'}
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => setIsHistoryOpen((prev) => !prev)}
-              disabled={!flowId}
-            >
-              Version History
-            </button>
-          </div>
-          <div className="form-row">
-            <button className="btn btn-secondary" onClick={handleExportJson}>
-              Download Script (.json)
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => importInputRef.current?.click()}
-            >
-              Import JSON
-            </button>
-            <input
-              ref={importInputRef}
-              type="file"
-              accept="application/json"
-              style={{ display: 'none' }}
-              onChange={handleImportJson}
-            />
-          </div>
-        </div>
-
         {selectedNodeId && (
           <div className="selected-indicator">
             Selected: <strong>{selectedNodeId}</strong>
           </div>
         )}
 
-        <div className="section">
-          <label className="section-label">Add Camera Keyframe</label>
+        <div className="tab-nav">
+          <button 
+            className={`tab-btn ${activeTab === 'blueprint' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('blueprint')}
+          >
+            🏗️ Blueprint
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'directing' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('directing')}
+          >
+            🎬 Directing
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'fx' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('fx')}
+          >
+            ✨ FX
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'render' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('render')}
+          >
+            🎞️ Render
+          </button>
+        </div>
+
+        {activeTab === 'blueprint' && (
+          <div className="tab-content">
+            <div className="section">
+              <label className="section-label">Flow Metadata</label>
+              <div className="form-field">
+                <label className="field-label">Flow Name</label>
+                <input
+                  className="field-input"
+                  value={flowName}
+                  onChange={(e) => setFlowName(e.target.value)}
+                  placeholder="Untitled Flow"
+                />
+              </div>
+              <div className="form-row">
+                <button className="btn btn-save" onClick={handleSaveVersion} disabled={isSaving}>
+                  {isSaving ? 'Saving...' : 'Save Version'}
+                </button>
+              </div>
+              <div className="form-row">
+                <button className="btn btn-secondary" onClick={handleExportJson}>
+                  Download Script (.json)
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => importInputRef.current?.click()}
+                >
+                  Import JSON
+                </button>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept="application/json"
+                  style={{ display: 'none' }}
+                  onChange={handleImportJson}
+                />
+              </div>
+            </div>
+
+            <div className="section">
+              <label className="section-label">Version History</label>
+              {!flowId && (
+                <p className="empty-hint">Save a version to enable history.</p>
+              )}
+              {flowId && (
+                <>
+                  <button className="btn btn-secondary" onClick={() => loadVersions(flowId)} style={{ marginBottom: '12px' }}>
+                    Load History
+                  </button>
+                  <div className="version-list-inline">
+                    {versions.length === 0 && (
+                      <p className="empty-hint">No versions yet.</p>
+                    )}
+                    {versions.map((version) => (
+                      <div key={version.id} className="version-item">
+                        <div className="version-meta">
+                          <div className="version-note">
+                            {version.versionNote || 'Untitled update'}
+                          </div>
+                          <div className="version-date">
+                            {new Date(version.createdAt).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="version-actions">
+                          <button className="btn btn-secondary" onClick={() => handleRollback(version)}>
+                            Rollback
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'directing' && (
+          <div className="tab-content">
+            <div className="section">
+              <label className="section-label">Auto Direct (AI Camera)</label>
+
+              <div className="form-row" style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={previewMode}
+                    onChange={(e) => setPreviewMode(e.target.checked)}
+                    style={{ width: '18px', height: '18px' }}
+                  />
+                  <span style={{ fontSize: '14px' }}>🎬 Sync Edges with Camera</span>
+                </label>
+              </div>
+
+              <div className="form-row">
+                <div className="form-field">
+                  <label className="field-label">Hold (frames)</label>
+                  <input className="field-input" type="number" min={10} max={300} value={holdFrames}
+                    onChange={(e) => setHoldFrames(Math.max(10, parseInt(e.target.value || '60', 10)))} />
+                </div>
+                <div className="form-field">
+                  <label className="field-label">Pan (frames)</label>
+                  <input className="field-input" type="number" min={5} max={120} value={panFrames}
+                    onChange={(e) => setPanFrames(Math.max(5, parseInt(e.target.value || '30', 10)))} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-field">
+                  <label className="field-label">Close zoom</label>
+                  <input className="field-input" type="number" step="0.1" min={0.5} max={5} value={zoomClose}
+                    onChange={(e) => setZoomClose(parseFloat(e.target.value || '1.8'))} />
+                </div>
+                <div className="form-field">
+                  <label className="field-label">Wide zoom</label>
+                  <input className="field-input" type="number" step="0.1" min={0.1} max={3} value={zoomWide}
+                    onChange={(e) => setZoomWide(parseFloat(e.target.value || '0.5'))} />
+                </div>
+              </div>
+
+              <button className="btn btn-auto" onClick={handleAutoRirect}>
+                ✨ Auto Direct (AI Camera)
+              </button>
+            </div>
+
+            <div className="section">
+              <label className="section-label">Add Camera Keyframe</label>
 
           <div className="form-row">
             <div className="form-field">
@@ -793,13 +891,17 @@ function StudioInner() {
             </div>
           </div>
 
-          <button className="btn btn-add" onClick={addKeyframe}>
-            + Add Keyframe
-          </button>
-        </div>
+              <button className="btn btn-add" onClick={addKeyframe}>
+                + Add Keyframe
+              </button>
+            </div>
+          </div>
+        )}
 
-        <div className="section">
-          <label className="section-label">✨ Edge Visual Effects</label>
+        {activeTab === 'fx' && (
+          <div className="tab-content">
+            <div className="section">
+              <label className="section-label">✨ Edge Visual Effects</label>
           
           <div className="form-field">
             <label className="field-label">Effect Type</label>
@@ -869,93 +971,13 @@ function StudioInner() {
               </tbody>
             </table>
           </div>
-        </div>
-
-        <div className="section">
-          <label className="section-label">Auto Direct (AI Camera)</label>
-
-          <div className="form-row" style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={previewMode}
-                onChange={(e) => setPreviewMode(e.target.checked)}
-                style={{ width: '18px', height: '18px' }}
-              />
-              <span style={{ fontSize: '14px' }}>🎬 Sync Edges with Camera</span>
-            </label>
-          </div>
-
-          <div className="form-row">
-            <div className="form-field">
-              <label className="field-label">Hold (frames)</label>
-              <input className="field-input" type="number" min={10} max={300} value={holdFrames}
-                onChange={(e) => setHoldFrames(Math.max(10, parseInt(e.target.value || '60', 10)))} />
-            </div>
-            <div className="form-field">
-              <label className="field-label">Pan (frames)</label>
-              <input className="field-input" type="number" min={5} max={120} value={panFrames}
-                onChange={(e) => setPanFrames(Math.max(5, parseInt(e.target.value || '30', 10)))} />
             </div>
           </div>
+        )}
 
-          <div className="form-row">
-            <div className="form-field">
-              <label className="field-label">Close zoom</label>
-              <input className="field-input" type="number" step="0.1" min={0.5} max={5} value={zoomClose}
-                onChange={(e) => setZoomClose(parseFloat(e.target.value || '1.8'))} />
-            </div>
-            <div className="form-field">
-              <label className="field-label">Wide zoom</label>
-              <input className="field-input" type="number" step="0.1" min={0.1} max={3} value={zoomWide}
-                onChange={(e) => setZoomWide(parseFloat(e.target.value || '0.5'))} />
-            </div>
-          </div>
-
-          <button className="btn btn-auto" onClick={handleAutoRirect}>
-            ✨ Auto Direct (AI Camera)
-          </button>
-        </div>
-
-        <div className="section">
-          <label className="section-label">
-            Timeline ({cameraSequence.length} keyframes)
-          </label>
-
-          {cameraSequence.length === 0 && (
-            <p className="empty-hint">Click a node, then add keyframes — or use Auto Direct above.</p>
-          )}
-
-          <div className="keyframe-list">
-            {cameraSequence.map((kf, idx) => (
-              <div key={idx} className="kf-item">
-                <input className="kf-edit kf-edit-frame" type="number" min={0} value={kf.frame}
-                  onChange={(e) => updateKeyframe(idx, 'frame', Math.max(0, parseInt(e.target.value || '0', 10)))} title="Frame" />
-                <select className="kf-edit kf-edit-target" value={kf.targetNodeId || ''}
-                  onChange={(e) => updateKeyframe(idx, 'targetNodeId', e.target.value || undefined)}>
-                  <option value="">manual</option>
-                  {selectableNodes.map((n) => (
-                    <option key={n.id} value={n.id}>{n.data?.title || n.id}</option>
-                  ))}
-                </select>
-                <input className="kf-edit kf-edit-zoom" type="number" step="0.1" min={0.1} max={5} value={kf.zoom}
-                  onChange={(e) => updateKeyframe(idx, 'zoom', parseFloat(e.target.value || '1'))} title="Zoom" />
-                <button className="kf-remove" onClick={() => removeKeyframe(idx)} title="Remove keyframe">✕</button>
-              </div>
-            ))}
-          </div>
-
-          {cameraSequence.length > 0 && (
-            <button
-              className="btn btn-clear"
-              onClick={() => setCameraSequence([])}
-            >
-              Clear All
-            </button>
-          )}
-        </div>
-
-        <div className="section export-section">
+        {activeTab === 'render' && (
+          <div className="tab-content">
+            <div className="section export-section">
           <button
             className="btn btn-export"
             onClick={handleExport}
@@ -979,50 +1001,53 @@ function StudioInner() {
               </a>
             </div>
           )}
-        </div>
+            </div>
+          </div>
+        )}
+      </div>
       </div>
 
-      <div className={`version-drawer ${isHistoryOpen ? 'open' : ''}`}>
-        <div className="version-drawer-header">
-          <div>
-            <h3>Version History</h3>
-            <p>{flowName || 'Untitled Flow'}</p>
-          </div>
-          <button className="btn btn-ghost" onClick={() => setIsHistoryOpen(false)}>
-            Close
-          </button>
+      <div className="timeline-bottom-bar">
+        <div className="timeline-header">
+          <label className="timeline-title">
+            🎬 Timeline ({cameraSequence.length} keyframes)
+          </label>
+          {cameraSequence.length > 0 && (
+            <button
+              className="btn btn-clear-timeline"
+              onClick={() => setCameraSequence([])}
+            >
+              Clear All
+            </button>
+          )}
         </div>
-        {!flowId && (
-          <p className="empty-hint">Save a version to enable history.</p>
-        )}
-        {flowId && (
-          <div className="version-list">
-            {versions.length === 0 && (
-              <p className="empty-hint">No versions yet.</p>
-            )}
-            {versions.map((version) => (
-              <div key={version.id} className="version-item">
-                <div className="version-meta">
-                  <div className="version-note">
-                    {version.versionNote || 'Untitled update'}
-                  </div>
-                  <div className="version-date">
-                    {new Date(version.createdAt).toLocaleString()}
-                  </div>
-                </div>
-                <div className="version-actions">
-                  <button className="btn btn-secondary" onClick={() => handleRollback(version)}>
-                    Rollback
-                  </button>
-                </div>
+        
+        {cameraSequence.length === 0 ? (
+          <div className="timeline-empty">
+            <p className="timeline-empty-hint">Use Auto Direct or add keyframes manually from the Directing tab</p>
+          </div>
+        ) : (
+          <div className="timeline-track">
+            {cameraSequence.map((kf, idx) => (
+              <div key={idx} className="timeline-keyframe-item">
+                <div className="timeline-kf-label">KF {idx + 1}</div>
+                <input className="timeline-kf-input timeline-kf-frame" type="number" min={0} value={kf.frame}
+                  onChange={(e) => updateKeyframe(idx, 'frame', Math.max(0, parseInt(e.target.value || '0', 10)))} 
+                  placeholder="Frame" />
+                <select className="timeline-kf-input timeline-kf-target" value={kf.targetNodeId || ''}
+                  onChange={(e) => updateKeyframe(idx, 'targetNodeId', e.target.value || undefined)}>
+                  <option value="">manual</option>
+                  {selectableNodes.map((n) => (
+                    <option key={n.id} value={n.id}>{n.data?.title || n.id}</option>
+                  ))}
+                </select>
+                <input className="timeline-kf-input timeline-kf-zoom" type="number" step="0.1" min={0.1} max={5} value={kf.zoom}
+                  onChange={(e) => updateKeyframe(idx, 'zoom', parseFloat(e.target.value || '1'))} 
+                  placeholder="Zoom" />
+                <button className="timeline-kf-remove" onClick={() => removeKeyframe(idx)} title="Remove keyframe">✕</button>
               </div>
             ))}
           </div>
-        )}
-        {flowId && (
-          <button className="btn btn-secondary" onClick={() => loadVersions(flowId)}>
-            Refresh
-          </button>
         )}
       </div>
     </div>
