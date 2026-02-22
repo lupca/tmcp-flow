@@ -11,16 +11,17 @@ import {
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import '@xyflow/react/dist/style.css';
 import UniversalNode from '../components/UniversalNode';
+import GroupNode from '../components/GroupNode';
 import ViralEdge from '../components/ViralEdge';
 import { layoutWithElk } from '../utils/elkLayout';
-import { initialNodes, initialEdges, groupDefaultStyle } from '../constants/flowConstants';
+import { initialNodes, initialEdges, groupDefaultStyle, NODE_THEMES, SELECTION_EFFECTS, getGroupStyleForTheme } from '../constants/flowConstants';
 import { generateAutoSequence, annotateEdgesWithTiming } from '../utils/autoDirect';
 import { ensureLayout } from '../utils/flowUtils';
 import { captureThumbnail, downloadJson } from '../utils/exportUtils';
 
 const AI_API_URL = 'http://localhost:8000';
 
-const nodeTypes = { universal: UniversalNode };
+const nodeTypes = { universal: UniversalNode, group: GroupNode };
 const edgeTypes = { viral: ViralEdge };
 
 function StudioInner() {
@@ -29,6 +30,9 @@ function StudioInner() {
   const [cameraSequence, setCameraSequence] = useState([]);
   const [previewMode, setPreviewMode] = useState(false);
   const [edgeEffectType, setEdgeEffectType] = useState('neon_path');
+  const [nodeTheme, setNodeTheme] = useState('vercel_glass');
+  const [selectionEffect, setSelectionEffect] = useState('glow_scale');
+  const [renderSelectionEffect, setRenderSelectionEffect] = useState(true);
   const [introText, setIntroText] = useState('');
 
 
@@ -127,7 +131,12 @@ function StudioInner() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nodes,
+          nodes: nodes.map(node => ({
+            ...node,
+            // Ensure width/height are explicitly included for rendering
+            width: node.width || node.style?.width,
+            height: node.height || node.style?.height,
+          })),
           edges,
           cameraSequence,
           renderWidth: 1080,
@@ -135,6 +144,9 @@ function StudioInner() {
           renderDuration,
           renderFps: 60,
           edgeEffectType,
+          nodeTheme,
+          selectionEffect,
+          renderSelectionEffect,
           previewMode,
           quality: renderQuality,
           introText,
@@ -243,6 +255,20 @@ function StudioInner() {
       });
     }
   }, [searchParams, loadFlow]);
+
+  // Propagate theme to all nodes when theme or selection effect changes
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          themeKey: nodeTheme,
+          selectionEffect: selectionEffect,
+        },
+      }))
+    );
+  }, [nodeTheme, selectionEffect, setNodes]);
 
   const handleSaveVersion = async () => {
     if (isSaving) return;
@@ -405,11 +431,17 @@ function StudioInner() {
               const rfNodes = sortedNodes.map((n) => ({
                 id: n.id,
                 type: n.type || 'universal',
-                data: n.data || { title: n.id },
+                data: {
+                  ...(n.data || { title: n.id }),
+                  themeKey: nodeTheme,
+                  selectionEffect: selectionEffect,
+                },
                 position: { x: 0, y: 0 },
+                // Child nodes get smaller width (150-180px), parent nodes get standard width (280px)
+                width: n.parentId ? 160 : 280,
                 ...(n.parentId ? { parentId: n.parentId, extent: n.extent || 'parent' } : {}),
                 ...(n.type === 'group'
-                  ? { style: { ...groupDefaultStyle, ...(n.style || {}) } }
+                  ? { style: { ...getGroupStyleForTheme(nodeTheme), ...(n.style || {}) } }
                   : {}),
               }));
 
@@ -649,6 +681,134 @@ function StudioInner() {
                   </>
                 )}
               </div>
+
+              {/* Node/Group Size Controls */}
+              {selectedNodeId && (() => {
+                const selectedNode = nodes.find(n => n.id === selectedNodeId);
+                if (!selectedNode) return null;
+                
+                const isGroup = selectedNode.type === 'group';
+                const currentWidth = selectedNode.width || selectedNode.style?.width || (isGroup ? 520 : 280);
+                const currentHeight = selectedNode.height || selectedNode.style?.height || (isGroup ? 260 : 'auto');
+                
+                const updateNodeSize = (widthDelta, heightDelta) => {
+                  setNodes((nds) =>
+                    nds.map((node) => {
+                      if (node.id !== selectedNodeId) return node;
+                      const minWidth = isGroup ? 200 : 120;
+                      const minHeight = isGroup ? 150 : 80;
+                      const defaultHeight = isGroup ? 260 : 200;
+                      
+                      const newWidth = Math.max(minWidth, (node.width || (isGroup ? 520 : 280)) + widthDelta);
+                      const newHeight = heightDelta ? Math.max(minHeight, (node.height || (isGroup ? 260 : defaultHeight)) + heightDelta) : (isGroup ? (node.height || 260) : undefined);
+                      
+                      return {
+                        ...node,
+                        width: newWidth,
+                        height: newHeight,
+                        style: {
+                          ...node.style,
+                          width: newWidth,
+                          height: newHeight,
+                        },
+                      };
+                    })
+                  );
+                };
+                
+                return (
+                  <div className="section">
+                    <label className="section-label">📏 {isGroup ? 'Group' : 'Node'} Size</label>
+                    <div style={{ 
+                      marginBottom: '12px',
+                      padding: '10px',
+                      background: 'rgba(15, 23, 42, 0.6)',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      color: '#94a3b8'
+                    }}>
+                      <div>Width: <strong style={{ color: '#f8fafc' }}>{Math.round(currentWidth)}px</strong></div>
+                      <div>Height: <strong style={{ color: '#f8fafc' }}>{currentHeight === 'auto' ? 'Auto' : Math.round(currentHeight) + 'px'}</strong></div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                      <button 
+                        className="btn btn-secondary"
+                        onClick={() => updateNodeSize(-20, 0)}
+                        style={{ flex: 1, fontSize: '18px', padding: '8px' }}
+                        title="Decrease width"
+                      >
+                        ◀️ Narrow
+                      </button>
+                      <button 
+                        className="btn btn-secondary"
+                        onClick={() => updateNodeSize(20, 0)}
+                        style={{ flex: 1, fontSize: '18px', padding: '8px' }}
+                        title="Increase width"
+                      >
+                        Wide ▶️
+                      </button>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                      <button 
+                        className="btn btn-secondary"
+                        onClick={() => updateNodeSize(0, -20)}
+                        style={{ flex: 1, fontSize: '18px', padding: '8px' }}
+                        title="Decrease height"
+                      >
+                        🔽 Short
+                      </button>
+                      <button 
+                        className="btn btn-secondary"
+                        onClick={() => updateNodeSize(0, 20)}
+                        style={{ flex: 1, fontSize: '18px', padding: '8px' }}
+                        title="Increase height"
+                      >
+                        Tall 🔼
+                      </button>
+                    </div>
+                    
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setNodes((nds) =>
+                          nds.map((node) => {
+                            if (node.id !== selectedNodeId) return node;
+                            const defaultWidth = isGroup ? 520 : 280;
+                            const defaultHeight = isGroup ? 260 : undefined;
+                            return {
+                              ...node,
+                              width: defaultWidth,
+                              height: defaultHeight,
+                              style: {
+                                ...node.style,
+                                width: defaultWidth,
+                                height: defaultHeight,
+                              },
+                            };
+                          })
+                        );
+                      }}
+                      style={{ width: '100%', fontSize: '12px' }}
+                    >
+                      🔄 Reset to Default
+                    </button>
+                    
+                    <div style={{
+                      marginTop: '10px',
+                      padding: '8px',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                    }}>
+                      💡 Tip: Click node + drag corners to resize with mouse
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -809,6 +969,122 @@ function StudioInner() {
                         <td style={{ padding: '3px 0' }}>👻 Ghost Echo</td>
                         <td style={{ padding: '3px 0' }}>Smooth</td>
                         <td style={{ padding: '3px 0' }}>Monitoring</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Node Visual Themes */}
+              <div className="section" style={{ marginTop: '24px' }}>
+                <label className="section-label">🎨 Node Visual Themes</label>
+
+                <div className="form-field">
+                  <label className="field-label">Theme Preset</label>
+                  <select
+                    className="field-input"
+                    value={nodeTheme}
+                    onChange={(e) => setNodeTheme(e.target.value)}
+                    style={{
+                      fontSize: '13px',
+                      padding: '8px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      color: '#fff',
+                      border: '1px solid rgba(148, 163, 184, 0.2)',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    {Object.entries(NODE_THEMES).map(([key, theme]) => (
+                      <option key={key} value={key}>
+                        {theme.emoji} {theme.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-field" style={{ marginTop: '12px' }}>
+                  <label className="field-label">Selection Effect</label>
+                  <select
+                    className="field-input"
+                    value={selectionEffect}
+                    onChange={(e) => setSelectionEffect(e.target.value)}
+                    style={{
+                      fontSize: '13px',
+                      padding: '8px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      color: '#fff',
+                      border: '1px solid rgba(148, 163, 184, 0.2)',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    {Object.entries(SELECTION_EFFECTS).map(([key, effect]) => (
+                      <option key={key} value={key}>
+                        {effect.emoji} {effect.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-row" style={{ marginTop: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={renderSelectionEffect}
+                      onChange={(e) => setRenderSelectionEffect(e.target.checked)}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <span style={{ fontSize: '14px' }}>🎯 Camera Focus Selection</span>
+                  </label>
+                </div>
+
+                <div style={{
+                  marginTop: '12px',
+                  padding: '10px',
+                  background: 'rgba(139, 92, 246, 0.1)',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  color: 'rgba(255, 255, 255, 0.8)',
+                }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#a78bfa' }}>💎 Theme Guide</div>
+                  <table style={{ width: '100%', fontSize: '10px', lineHeight: '1.4' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.2)' }}>
+                        <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Theme</th>
+                        <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Style</th>
+                        <th style={{ textAlign: 'left', padding: '4px 0', color: '#94a3b8' }}>Best For</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: '3px 0' }}>⚫ Vercel</td>
+                        <td style={{ padding: '3px 0' }}>Ultra-modern</td>
+                        <td style={{ padding: '3px 0' }}>SaaS/Tech</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '3px 0' }}>🟣 Linear</td>
+                        <td style={{ padding: '3px 0' }}>Luxury Purple</td>
+                        <td style={{ padding: '3px 0' }}>Premium</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '3px 0' }}>🌑 Slate</td>
+                        <td style={{ padding: '3px 0' }}>Professional</td>
+                        <td style={{ padding: '3px 0' }}>Corporate</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '3px 0' }}>⚡ Neon</td>
+                        <td style={{ padding: '3px 0' }}>Cyberpunk</td>
+                        <td style={{ padding: '3px 0' }}>Gaming/Viral</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '3px 0' }}>⚪ Minimal</td>
+                        <td style={{ padding: '3px 0' }}>Clean Apple</td>
+                        <td style={{ padding: '3px 0' }}>Elegant</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '3px 0' }}>🌈 Gradient</td>
+                        <td style={{ padding: '3px 0' }}>Multi-color</td>
+                        <td style={{ padding: '3px 0' }}>Creative</td>
                       </tr>
                     </tbody>
                   </table>

@@ -266,7 +266,10 @@ function parseRenderParams(body) {
         renderDuration: body.renderDuration || body.durationInFrames || 300,
         renderFps: body.renderFps || 60,
         edgeEffectType: body.edgeEffectType || 'neon_path',
+        nodeTheme: body.nodeTheme || 'vercel_glass',
+        selectionEffect: body.selectionEffect || 'glow_scale',
         previewMode: body.previewMode ?? false,
+        renderSelectionEffect: body.renderSelectionEffect ?? false,
         preset,
         qualityKey,
     };
@@ -279,8 +282,18 @@ function buildInputProps(body, params) {
         scenario = scenarios[0];
     } catch { scenario = { nodes: [], edges: [], config: {}, cameraSequence: [] }; }
 
+    const inputNodes = body.nodes || scenario.nodes;
+    
+    // Log node sizes for debugging
+    console.log('📊 Node sizes being passed to Remotion:');
+    inputNodes.forEach(node => {
+        if (node.type !== 'group') {
+            console.log(`  - ${node.id}: width=${node.width || 'undefined'}, height=${node.height || 'undefined'}, parentId=${node.parentId || 'none'}`);
+        }
+    });
+
     return {
-        nodes: body.nodes || scenario.nodes,
+        nodes: inputNodes,
         edges: body.edges || scenario.edges,
         config: body.config || scenario.config,
         cameraSequence: body.cameraSequence ?? scenario.cameraSequence,
@@ -289,7 +302,10 @@ function buildInputProps(body, params) {
         renderDuration: params.renderDuration,
         renderFps: params.renderFps,
         edgeEffectType: params.edgeEffectType,
+        nodeTheme: params.nodeTheme,
+        selectionEffect: params.selectionEffect,
         previewMode: params.previewMode,
+        renderSelectionEffect: params.renderSelectionEffect,
     };
 }
 

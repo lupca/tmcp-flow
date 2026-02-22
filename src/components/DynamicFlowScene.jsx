@@ -7,10 +7,11 @@ import {
 import { interpolate, Easing, useCurrentFrame, Audio } from 'remotion';
 import '@xyflow/react/dist/style.css';
 import UniversalNode from './UniversalNode';
+import GroupNode from './GroupNode';
 import ViralEdge from './ViralEdge';
 
 // Register node & edge types outside the component to avoid re-creation
-const nodeTypes = { universal: UniversalNode };
+const nodeTypes = { universal: UniversalNode, group: GroupNode };
 
 // Default fallback dimensions for nodes when width/height not yet measured
 // Matches typical UniversalNode rendered size
@@ -66,9 +67,52 @@ function DynamicFlowSceneInner({
   height = 1920,
   isRemotion = false,
   edgeEffectType = 'neon_path',
+  nodeTheme = 'vercel_glass',
+  selectionEffect = 'glow_scale',
   previewMode = false,
+  renderSelectionEffect = false,
   introAudioUrl = null,
 }) {
+  // ---- 0. Process nodes to ensure theme data is present ----
+  const processedNodes = useMemo(() => {
+    return nodes.map(node => {
+      // Group nodes just need their dimensions preserved
+      if (node.type === 'group') {
+        return {
+          ...node,
+          // Ensure group dimensions are explicitly set
+          width: node.width || node.style?.width,
+          height: node.height || node.style?.height,
+        };
+      }
+      
+      // Universal nodes need theme data + dimensions
+      const nodeWidth = node.width || node.style?.width;
+      const nodeHeight = node.height || node.style?.height;
+      
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          themeKey: node.data?.themeKey || nodeTheme,
+          selectionEffect: node.data?.selectionEffect || selectionEffect,
+          // Mark as child node if it has parentId (for proper scaling)
+          isChildNode: !!node.parentId,
+        },
+        // CRITICAL: Explicitly set width/height on the node object itself
+        // React Flow uses these to determine node dimensions
+        width: nodeWidth,
+        height: nodeHeight,
+        // Also keep in style as backup
+        style: {
+          ...node.style,
+          width: nodeWidth,
+          height: nodeHeight,
+        },
+      };
+    });
+  }, [nodes, nodeTheme, selectionEffect, isRemotion]);
+
   // ---- 1. Process keyframes: resolve targetNodeId → absolute x/y ----
   const processedKeyframes = useMemo(() => {
     if (!cameraSequence?.length) {
@@ -79,12 +123,12 @@ function DynamicFlowSceneInner({
     return cameraSequence
       .map((kf) => {
         if (kf.targetNodeId) {
-          const node = nodes.find((n) => n.id === kf.targetNodeId);
+          const node = processedNodes.find((n) => n.id === kf.targetNodeId);
           if (node) {
             const nodeW = getNodeW(node);
             const nodeH = getNodeH(node);
             // Use ABSOLUTE position (handles child nodes inside groups)
-            const absPos = getAbsolutePosition(node, nodes);
+            const absPos = getAbsolutePosition(node, processedNodes);
             const centerX = absPos.x + nodeW / 2;
             const centerY = absPos.y + nodeH / 2;
             const zoom = kf.zoom || 1;
@@ -108,7 +152,7 @@ function DynamicFlowSceneInner({
         };
       })
       .sort((a, b) => a.frame - b.frame);
-  }, [cameraSequence, nodes, width, height]);
+  }, [cameraSequence, processedNodes, width, height]);
 
   // ---- 2. Interpolate viewport with per-segment easing ----
   const currentViewport = useMemo(() => {
@@ -164,6 +208,86 @@ function DynamicFlowSceneInner({
     };
   }, [frame, processedKeyframes]);
 
+  const targetKeyframes = useMemo(() => {
+    return [...cameraSequence]
+      .filter((kf) => kf?.targetNodeId)
+      .sort((a, b) => a.frame - b.frame);
+  }, [cameraSequence]);
+
+  const edgeStartByNode = useMemo(() => {
+    const map = new Map();
+    for (const edge of edges || []) {
+      const startFrame = edge?.data?.startFrame;
+      if (startFrame == null) continue;
+      const current = map.get(edge.source);
+      if (current == null || startFrame < current) {
+        map.set(edge.source, startFrame);
+      }
+    }
+    return map;
+  }, [edges]);
+
+  const selectionTimeline = useMemo(() => {
+    const timeline = targetKeyframes.map((kf) => ({
+      nodeId: kf.targetNodeId,
+      frame: edgeStartByNode.get(kf.targetNodeId) ?? kf.frame,
+    }));
+
+    if (timeline.length === 0) {
+      edgeStartByNode.forEach((startFrame, nodeId) => {
+        timeline.push({ nodeId, frame: startFrame });
+      });
+    }
+
+    return timeline.sort((a, b) => a.frame - b.frame);
+  }, [targetKeyframes, edgeStartByNode]);
+
+  const focusedNodeId = useMemo(() => {
+    if (!renderSelectionEffect) return null;
+
+    const selectableNodes = processedNodes.filter((node) => node.type !== 'group');
+    if (!selectableNodes.length) return null;
+
+    if (selectionTimeline.length > 0) {
+      for (let i = 0; i < selectionTimeline.length; i += 1) {
+        const current = selectionTimeline[i];
+        const next = selectionTimeline[i + 1];
+        const inWindow = frame >= current.frame && (!next || frame < next.frame);
+        if (inWindow) return current.nodeId;
+      }
+    }
+
+    const zoom = currentViewport.zoom || 0.0001;
+    const centerX = (width / 2 - currentViewport.x) / zoom;
+    const centerY = (height / 2 - currentViewport.y) / zoom;
+
+    let closestId = null;
+    let closestDist = Infinity;
+
+    for (const node of selectableNodes) {
+      const nodeW = getNodeW(node);
+      const nodeH = getNodeH(node);
+      const absPos = getAbsolutePosition(node, processedNodes);
+      const nodeCenterX = absPos.x + nodeW / 2;
+      const nodeCenterY = absPos.y + nodeH / 2;
+      const dist = (nodeCenterX - centerX) ** 2 + (nodeCenterY - centerY) ** 2;
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestId = node.id;
+      }
+    }
+
+    return closestId;
+  }, [renderSelectionEffect, processedNodes, currentViewport, width, height, selectionTimeline, frame]);
+
+  const nodesWithSelection = useMemo(() => {
+    const shouldSelect = renderSelectionEffect && focusedNodeId;
+    return processedNodes.map((node) => ({
+      ...node,
+      selected: shouldSelect ? node.id === focusedNodeId && node.type !== 'group' : false,
+    }));
+  }, [processedNodes, renderSelectionEffect, focusedNodeId]);
+
   // ---- 3. Inject current frame, effect type, and preview mode into edges ----
   // Create edge types wrapper that passes frame and settings to ViralEdge
   const edgeTypesWithFrame = useMemo(() => ({
@@ -175,7 +299,7 @@ function DynamicFlowSceneInner({
     <div style={{ width: '100%', height: '100%', background: '#0B0F19' }}>
       {introAudioUrl && <Audio src={introAudioUrl} />}
       <ReactFlow
-        nodes={nodes}
+        nodes={nodesWithSelection}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypesWithFrame}
