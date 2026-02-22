@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 
 // ── Performance: Quality Presets ──────────────────────────────────────
 const cpuCount = os.cpus().length;
@@ -45,12 +46,15 @@ const port = 3000;
 
 app.use(express.json({ limit: '50mb' }));
 app.use('/out', express.static('out'));
+app.use('/public', express.static(path.join(process.cwd(), 'public')));
 
 const SCENARIOS_PATH = path.join(process.cwd(), 'server/data/scenarios.json');
 const OUT_DIR = path.join(process.cwd(), 'out');
+const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const DB_PATH = path.join(process.cwd(), 'server/data/flows.db');
 
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
+if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 if (!fs.existsSync(path.dirname(DB_PATH))) fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
 const db = new Database(DB_PATH);
@@ -346,6 +350,29 @@ app.post('/api/render', async (req, res) => {
 
     try {
         const inputProps = buildInputProps(req.body, params);
+
+        // Handle TTS Intro Generation
+        if (req.body.introText && typeof req.body.introText === 'string') {
+            try {
+                const tts = new MsEdgeTTS();
+                await tts.setMetadata('en-US-AriaNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+
+                const audioDirName = `intro-${Date.now()}`;
+                const audioDirPath = path.join(PUBLIC_DIR, audioDirName);
+
+                fs.mkdirSync(audioDirPath, { recursive: true });
+
+                console.log(`[TTS] Generating intro voiceover in: ${audioDirName}`);
+                await tts.toFile(audioDirPath, req.body.introText);
+
+                inputProps.introAudioUrl = `http://localhost:${port}/public/${audioDirName}/audio.mp3`;
+                console.log(`[TTS] Voiceover ready at ${inputProps.introAudioUrl}`);
+            } catch (ttsError) {
+                console.error('[TTS] Error generating voiceover:', ttsError.message);
+                // Continue without audio if TTS fails
+            }
+        }
+
         const outputFilename = `render-${Date.now()}.${preset.codec.startsWith('prores') ? 'mov' : 'mp4'}`;
         const outputPath = path.join(OUT_DIR, outputFilename);
 
@@ -410,6 +437,27 @@ app.post('/api/render-stream', async (req, res) => {
 
     try {
         const inputProps = buildInputProps(req.body, params);
+
+        // Handle TTS Intro Generation
+        if (req.body.introText && typeof req.body.introText === 'string') {
+            send({ type: 'status', message: 'Generating AI voiceover...' });
+            try {
+                const tts = new MsEdgeTTS();
+                await tts.setMetadata('en-US-AriaNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+
+                const audioDirName = `intro-${Date.now()}`;
+                const audioDirPath = path.join(PUBLIC_DIR, audioDirName);
+
+                fs.mkdirSync(audioDirPath, { recursive: true });
+
+                await tts.toFile(audioDirPath, req.body.introText);
+                inputProps.introAudioUrl = `http://localhost:${port}/public/${audioDirName}/audio.mp3`;
+            } catch (ttsError) {
+                console.error('[TTS] Error generating voiceover:', ttsError.message);
+                // Continue without audio if TTS fails
+            }
+        }
+
         const outputFilename = `render-${Date.now()}.${preset.codec.startsWith('prores') ? 'mov' : 'mp4'}`;
         const outputPath = path.join(OUT_DIR, outputFilename);
 

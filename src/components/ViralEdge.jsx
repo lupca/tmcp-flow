@@ -22,10 +22,10 @@ function NeonPathEffect({ path, strokeColor, strokeOpacity, glowIntensity, isAct
         <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur in="SourceGraphic" stdDeviation={3 * glowIntensity} result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          <feDropShadow 
-            dx="0" dy="0" 
-            stdDeviation={4 * glowIntensity} 
-            floodColor={strokeColor} 
+          <feDropShadow
+            dx="0" dy="0"
+            stdDeviation={4 * glowIntensity}
+            floodColor={strokeColor}
             floodOpacity={0.6 * glowIntensity}
           />
         </filter>
@@ -69,10 +69,10 @@ function SteppedCircuitEffect({ path, strokeColor, strokeOpacity, isActive, fram
   return (
     <>
       <BaseEdge path={path} style={{ stroke: strokeColor, strokeOpacity: 0.1, strokeWidth: 1, fill: 'none' }} />
-      <BaseEdge path={path} style={{ 
-        stroke: strokeColor, 
-        strokeOpacity, 
-        strokeWidth: 2, 
+      <BaseEdge path={path} style={{
+        stroke: strokeColor,
+        strokeOpacity,
+        strokeWidth: 2,
         strokeDasharray: '10 10',
         strokeDashoffset: -dashOffset,
         fill: 'none',
@@ -121,15 +121,25 @@ function ElectricBoltEffect({ path, strokeColor, strokeOpacity, isActive, filter
       </defs>
       <BaseEdge path={path} style={{ stroke: strokeColor, strokeOpacity: 0.2, strokeWidth: 1, fill: 'none' }} />
       {isActive && (
-        <BaseEdge path={path} style={{ 
-          stroke: strokeColor, 
-          strokeOpacity: strokeOpacity * 1.2, 
-          strokeWidth: 2, 
-          strokeDasharray: '15 85',
-          strokeDashoffset: -boltOffset,
-          fill: 'none',
-          filter: `url(#${filterId})`
-        }} />
+        <>
+          <path
+            d={path}
+            fill="none"
+            stroke={strokeColor}
+            strokeOpacity={strokeOpacity * 1.2}
+            strokeWidth={2}
+            strokeDasharray="15 85"
+            strokeDashoffset={-boltOffset}
+            filter={`url(#${filterId})`}
+          >
+            <animate attributeName="stroke-dashoffset" values="0;-100" dur="0.4s" repeatCount="indefinite" />
+          </path>
+          {[0, 0.15, 0.35].map((delay, i) => (
+            <circle key={i} r="3" fill={strokeColor} opacity={strokeOpacity} filter={`url(#${filterId})`}>
+              <animateMotion dur="0.5s" repeatCount="indefinite" path={path} begin={`${delay}s`} />
+            </circle>
+          ))}
+        </>
       )}
     </>
   );
@@ -143,9 +153,9 @@ function DataPacketsEffect({ path, strokeColor, strokeOpacity, isActive, id }) {
       <BaseEdge path={path} style={{ stroke: strokeColor, strokeOpacity: 0.15, strokeWidth: 1, strokeDasharray: '2 4', fill: 'none' }} />
       {isActive && packets.map((delay, i) => (
         <g key={i}>
-          <rect 
-            x="-4" y="-4" width="8" height="8" 
-            fill={strokeColor} 
+          <rect
+            x="-4" y="-4" width="8" height="8"
+            fill={strokeColor}
             opacity={strokeOpacity}
             rx="1"
           >
@@ -159,28 +169,42 @@ function DataPacketsEffect({ path, strokeColor, strokeOpacity, isActive, id }) {
 
 // 7. Liquid Gradient (Flowing gradient)
 function LiquidGradientEffect({ path, strokeColor, strokeOpacity, isActive, id, frame }) {
-  const gradientId = `gradient-${id}`;
-  const offset = (frame * 2) % 100;
-  
+  const filterId = `liquid-glow-${id}`;
+  const dashOffset = (frame * 3) % 200;
+
   return (
     <>
       <defs>
-        <linearGradient id={gradientId} gradientUnits="userSpaceOnUse">
-          <stop offset={`${offset}%`} stopColor={strokeColor} stopOpacity="0" />
-          <stop offset={`${(offset + 20) % 100}%`} stopColor={strokeColor} stopOpacity={strokeOpacity} />
-          <stop offset={`${(offset + 40) % 100}%`} stopColor={strokeColor} stopOpacity="0" />
-          <animateTransform
-            attributeName="gradientTransform"
-            type="translate"
-            values="0 0; 1 0"
-            dur="2s"
-            repeatCount="indefinite"
-          />
-        </linearGradient>
+        <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" />
+          <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor={strokeColor} floodOpacity="0.6" />
+        </filter>
       </defs>
       <BaseEdge path={path} style={{ stroke: strokeColor, strokeOpacity: 0.1, strokeWidth: 2, fill: 'none' }} />
       {isActive && (
-        <BaseEdge path={path} style={{ stroke: `url(#${gradientId})`, strokeWidth: 4, fill: 'none' }} />
+        <>
+          {/* Flowing dash segment with glow */}
+          <path
+            d={path}
+            fill="none"
+            stroke={strokeColor}
+            strokeOpacity={strokeOpacity * 0.9}
+            strokeWidth={4}
+            strokeDasharray="40 160"
+            strokeDashoffset={-dashOffset}
+            strokeLinecap="round"
+            filter={`url(#${filterId})`}
+          >
+            <animate attributeName="stroke-dashoffset" values="0;-200" dur="2s" repeatCount="indefinite" />
+          </path>
+          {/* Flowing particle trail */}
+          {[0, 0.7, 1.4].map((delay, i) => (
+            <circle key={i} r="5" fill={strokeColor} opacity={strokeOpacity * 0.5} filter={`url(#${filterId})`}>
+              <animateMotion dur="2.5s" repeatCount="indefinite" path={path} begin={`${delay}s`} />
+              <animate attributeName="r" values="5;7;5" dur="1.2s" repeatCount="indefinite" />
+            </circle>
+          ))}
+        </>
       )}
     </>
   );
@@ -191,7 +215,7 @@ function PulseGlowEffect({ path, strokeColor, strokeOpacity, isActive, filterId,
   const pulsePhase = Math.sin((frame - startFrame) * 0.1) * 0.5 + 0.5;
   const breatheWidth = 2 + pulsePhase * 2;
   const breatheOpacity = strokeOpacity * (0.6 + pulsePhase * 0.4);
-  
+
   return (
     <>
       <defs>
@@ -201,10 +225,10 @@ function PulseGlowEffect({ path, strokeColor, strokeOpacity, isActive, filterId,
         </filter>
       </defs>
       <BaseEdge path={path} style={{ stroke: strokeColor, strokeOpacity: 0.2, strokeWidth: 1, fill: 'none' }} />
-      <BaseEdge path={path} style={{ 
-        stroke: strokeColor, 
-        strokeOpacity: breatheOpacity, 
-        strokeWidth: breatheWidth, 
+      <BaseEdge path={path} style={{
+        stroke: strokeColor,
+        strokeOpacity: breatheOpacity,
+        strokeWidth: breatheWidth,
         fill: 'none',
         filter: `url(#${filterId})`
       }} />
@@ -219,33 +243,33 @@ function PulseGlowEffect({ path, strokeColor, strokeOpacity, isActive, filterId,
   );
 }
 
-const ViralEdge = ({ 
-  id, 
-  sourceX, 
-  sourceY, 
-  targetX, 
-  targetY, 
-  sourcePosition, 
-  targetPosition, 
-  style = {}, 
-  markerEnd, 
+const ViralEdge = ({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  markerEnd,
   label,
   data = {},
   currentFrame // Injected by DynamicFlowScene
 }) => {
-  const [path, labelX, labelY] = getBezierPath({ 
-    sourceX, 
-    sourceY, 
-    sourcePosition, 
-    targetX, 
-    targetY, 
-    targetPosition 
+  const [path, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition
   });
 
   // Get current frame - only use useCurrentFrame() in Remotion context
   let frame = 0;
   let isInEditor = false;
-  
+
   if (currentFrame !== undefined) {
     // Frame prop provided by DynamicFlowScene (Remotion rendering)
     frame = currentFrame;
@@ -259,24 +283,24 @@ const ViralEdge = ({
       frame = 0;
     }
   }
-  
+
   // Extract activation timing, preview mode, and effect type from edge data
   const startFrame = data.startFrame ?? 0;
   const previewMode = data.previewMode ?? false;
   const effectType = data.effectType ?? 'neon_path';
-  
+
   // Determine if edge should be active
   // Preview Mode OFF: edges always active (no camera sync) - for continuous animation
   // Preview Mode ON: edges sync with camera (activate when camera reaches source node)
   // This applies to both editor and Remotion rendering
   const isActive = !previewMode ? true : (frame >= startFrame);
-  
+
   // Spring animation for smooth activation transition (15 frames = ~250ms at 60fps)
   const activationProgress = useMemo(() => {
     if (!isActive) return 0;
-    // In editor without preview mode, show immediately at full strength
-    if (isInEditor && !previewMode) return 1;
-    
+    // No camera sync — show immediately at full strength (both editor and Remotion)
+    if (!previewMode) return 1;
+
     const framesSinceStart = frame - startFrame;
     return spring({
       frame: framesSinceStart,
@@ -297,7 +321,7 @@ const ViralEdge = ({
 
   // Unique filter ID for this edge
   const filterId = `glow-${id}`;
-  
+
   // Particle style for effects that need it
   const particleStyle = {
     fill: strokeColor,
@@ -310,7 +334,7 @@ const ViralEdge = ({
   return (
     <>
       {/* Render the selected effect */}
-      <EffectRenderer 
+      <EffectRenderer
         path={path}
         strokeColor={strokeColor}
         strokeOpacity={strokeOpacity}
@@ -327,9 +351,9 @@ const ViralEdge = ({
       {/* Edge label */}
       {label && (
         <EdgeLabelRenderer>
-          <div 
-            className="edge-label nodrag nopan" 
-            style={{ 
+          <div
+            className="edge-label nodrag nopan"
+            style={{
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             }}
           >

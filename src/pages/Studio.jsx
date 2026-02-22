@@ -29,6 +29,7 @@ function StudioInner() {
   const [cameraSequence, setCameraSequence] = useState([]);
   const [previewMode, setPreviewMode] = useState(false);
   const [edgeEffectType, setEdgeEffectType] = useState('neon_path');
+  const [introText, setIntroText] = useState('');
 
 
 
@@ -136,6 +137,7 @@ function StudioInner() {
           edgeEffectType,
           previewMode,
           quality: renderQuality,
+          introText,
         }),
       });
 
@@ -672,6 +674,17 @@ function StudioInner() {
                 <button className="btn btn-auto" onClick={handleAutoRirect}>
                   ✨ Auto Direct (AI Camera)
                 </button>
+              </div>
+
+              <div className="section">
+                <label className="section-label">Intro Voiceover (English)</label>
+                <textarea
+                  className="field-input"
+                  style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
+                  placeholder="Enter text for AI voiceover (e.g., Welcome to the architecture overview...)"
+                  value={introText}
+                  onChange={(e) => setIntroText(e.target.value)}
+                />
               </div>
 
               <div className="section">

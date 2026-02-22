@@ -4,7 +4,7 @@ import {
   ReactFlowProvider,
   Background,
 } from '@xyflow/react';
-import { interpolate, Easing, useCurrentFrame } from 'remotion';
+import { interpolate, Easing, useCurrentFrame, Audio } from 'remotion';
 import '@xyflow/react/dist/style.css';
 import UniversalNode from './UniversalNode';
 import ViralEdge from './ViralEdge';
@@ -67,6 +67,7 @@ function DynamicFlowSceneInner({
   isRemotion = false,
   edgeEffectType = 'neon_path',
   previewMode = false,
+  introAudioUrl = null,
 }) {
   // ---- 1. Process keyframes: resolve targetNodeId → absolute x/y ----
   const processedKeyframes = useMemo(() => {
@@ -172,6 +173,7 @@ function DynamicFlowSceneInner({
   // ---- 4. Render ----
   return (
     <div style={{ width: '100%', height: '100%', background: '#0B0F19' }}>
+      {introAudioUrl && <Audio src={introAudioUrl} />}
       <ReactFlow
         nodes={nodes}
         edges={edges}
