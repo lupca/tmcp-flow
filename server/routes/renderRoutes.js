@@ -10,11 +10,11 @@ const router = express.Router();
 let activeRender = null;
 
 /**
- * Initialize render routes with bundleLocation state
- * @param {string} bundleLocation - Path to bundled Remotion composition
+ * Initialize render routes with bundleState
+ * @param {Object} bundleState - Bundle state object { location, ready }
  * @param {number} port - Server port
  */
-function initializeRenderRoutes(bundleLocation, port) {
+function initializeRenderRoutes(bundleState, port) {
     /**
      * GET /api/render/presets - List available quality presets
      */
@@ -32,7 +32,7 @@ function initializeRenderRoutes(bundleLocation, port) {
      * POST /api/render - Render video and return JSON result
      */
     router.post('/api/render', async (req, res) => {
-        if (!bundleLocation) {
+        if (!bundleState.location) {
             return res.status(503).json({ error: 'Server is still bundling. Please wait and try again.' });
         }
         if (activeRender) {
@@ -67,7 +67,7 @@ function initializeRenderRoutes(bundleLocation, port) {
             const outputPath = path.join(PATHS.OUT_DIR, outputFilename);
 
             const composition = await selectComposition({
-                serveUrl: bundleLocation,
+                serveUrl: bundleState.location,
                 id: RENDER_CONFIG.COMPOSITION_ID,
                 inputProps,
             });
@@ -81,7 +81,7 @@ function initializeRenderRoutes(bundleLocation, port) {
                 }
             });
 
-            opts.serveUrl = bundleLocation;
+            opts.serveUrl = bundleState.location;
             await renderMedia(opts);
 
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -105,7 +105,7 @@ function initializeRenderRoutes(bundleLocation, port) {
      * POST /api/render-stream - Real-time render progress via SSE
      */
     router.post('/api/render-stream', async (req, res) => {
-        if (!bundleLocation) {
+        if (!bundleState.location) {
             res.status(503).json({ error: 'Server is still bundling.' });
             return;
         }
@@ -154,7 +154,7 @@ function initializeRenderRoutes(bundleLocation, port) {
 
             send({ type: 'status', message: 'Selecting composition...' });
             const composition = await selectComposition({
-                serveUrl: bundleLocation,
+                serveUrl: bundleState.location,
                 id: RENDER_CONFIG.COMPOSITION_ID,
                 inputProps,
             });
@@ -170,7 +170,7 @@ function initializeRenderRoutes(bundleLocation, port) {
                 }
             });
 
-            opts.serveUrl = bundleLocation;
+            opts.serveUrl = bundleState.location;
             await renderMedia(opts);
 
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

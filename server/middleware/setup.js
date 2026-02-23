@@ -27,11 +27,11 @@ function setupMiddleware(app) {
 /**
  * Setup health check endpoint
  * @param {express.Application} app - Express app instance
- * @param {boolean} isBundleReady - Is bundle ready
+ * @param {Object} bundleState - Bundle state object { location, ready }
  */
-function setupHealthEndpoint(app, isBundleReady) {
+function setupHealthEndpoint(app, bundleState) {
     app.get('/api/health', (req, res) => {
-        res.json({ status: 'ok', bundleReady: isBundleReady });
+        res.json({ status: 'ok', bundleReady: bundleState.ready, bundleLocation: bundleState.location ? 'set' : 'not-set' });
     });
 }
 

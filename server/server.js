@@ -10,8 +10,7 @@ const app = express();
 const port = SERVER_CONFIG.PORT;
 
 // ── Bundle State ──────────────────────────────────────────────────────
-let bundleLocation = null;
-let isBundleReady = false;
+const bundleState = { location: null, ready: false };
 
 /**
  * Pre-bundle the Remotion composition
@@ -19,9 +18,9 @@ let isBundleReady = false;
 async function preBundle() {
     console.log('Pre-bundling project...');
     try {
-        bundleLocation = await bundle({ entryPoint: PATHS.REMOTION_ENTRY });
-        isBundleReady = true;
-        console.log(`Bundle created: ${bundleLocation}`);
+        bundleState.location = await bundle({ entryPoint: PATHS.REMOTION_ENTRY });
+        bundleState.ready = true;
+        console.log(`Bundle created: ${bundleState.location}`);
     } catch (e) {
         console.error('Bundle failed:', e);
     }
@@ -35,7 +34,7 @@ async function initializeServer() {
     setupMiddleware(app);
 
     // Setup health check endpoint
-    setupHealthEndpoint(app, isBundleReady);
+    setupHealthEndpoint(app, bundleState);
 
     // Initialize database
     const db = initializeDatabase();
@@ -45,7 +44,7 @@ async function initializeServer() {
     initializeFlowRoutes(stmts, db);
     app.use(flowRouter);
 
-    initializeRenderRoutes(bundleLocation, port);
+    initializeRenderRoutes(bundleState, port);
     app.use(renderRouter);
 
     // Start server
