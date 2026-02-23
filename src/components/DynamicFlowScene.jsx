@@ -98,6 +98,8 @@ function DynamicFlowSceneInner({
           selectionEffect: node.data?.selectionEffect || selectionEffect,
           // Mark as child node if it has parentId (for proper scaling)
           isChildNode: !!node.parentId,
+          // Hide NodeResizer (resize handles/border) during video rendering
+          isRendering: true,
         },
         // CRITICAL: Explicitly set width/height on the node object itself
         // React Flow uses these to determine node dimensions
@@ -296,7 +298,7 @@ function DynamicFlowSceneInner({
 
   // ---- 4. Render ----
   return (
-    <div style={{ width: '100%', height: '100%', background: '#0B0F19' }}>
+    <div className="remotion-render" style={{ width: '100%', height: '100%', background: '#0B0F19' }}>
       {introAudioUrl && <Audio src={introAudioUrl} />}
       <ReactFlow
         nodes={nodesWithSelection}

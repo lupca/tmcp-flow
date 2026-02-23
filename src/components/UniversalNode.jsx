@@ -82,7 +82,7 @@ const UniversalNode = ({ data, selected, id }) => {
     <div style={containerStyle}>
       {/* NodeResizer - allows dragging corners/edges to resize */}
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !data?.isRendering}
         minWidth={120}
         minHeight={80}
         lineStyle={{
