@@ -2,7 +2,7 @@ import express from 'express';
 import { selectComposition, renderMedia } from '@remotion/renderer';
 import path from 'path';
 import { QUALITY_PRESETS, PATHS, RENDER_CONFIG, SERVER_CONFIG } from '../config/config.js';
-import { parseRenderParams, buildInputProps, buildRenderOptions } from '../services/renderService.js';
+import { parseRenderParams, buildInputProps, buildCascadeInputProps, buildRenderOptions } from '../services/renderService.js';
 import { generateIntroAudio } from '../services/ttsService.js';
 
 const router = express.Router();
@@ -160,6 +160,80 @@ function initializeRenderRoutes(bundleState, port) {
             });
 
             send({ type: 'status', message: 'Rendering frames...' });
+            const { opts, finalPath } = buildRenderOptions(composition, outputPath, inputProps, preset, ({ progress }) => {
+                const pct = Math.round(progress * 100);
+                if (pct > lastPct) {
+                    lastPct = pct;
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    const eta = progress > 0.01 ? Math.round((elapsed / progress) * (1 - progress)) : null;
+                    send({ type: 'progress', progress: pct, elapsed: Math.round(elapsed), eta });
+                }
+            });
+
+            opts.serveUrl = bundleState.location;
+            await renderMedia(opts);
+
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            const finalFilename = path.basename(finalPath);
+            send({ type: 'complete', videoUrl: `/out/${finalFilename}`, elapsed: Number(elapsed), quality: qualityKey });
+        } catch (error) {
+            send({ type: 'error', message: error.message });
+        } finally {
+            activeRender = null;
+            res.end();
+        }
+    });
+
+    /**
+     * POST /api/render-cascade - Render Cascade Failure video via SSE
+     */
+    router.post('/api/render-cascade', async (req, res) => {
+        if (!bundleState.location) {
+            res.status(503).json({ error: 'Server is still bundling.' });
+            return;
+        }
+        if (activeRender) {
+            res.status(409).json({ error: 'A render is already in progress.' });
+            return;
+        }
+
+        // Setup SSE headers
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+        });
+
+        const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+        const params = parseRenderParams(req.body);
+        const { preset, qualityKey } = params;
+
+        send({ type: 'status', message: `Starting cascade render — ${qualityKey} quality, ${preset.concurrency} threads` });
+
+        const startTime = Date.now();
+        activeRender = { startTime, aborted: false };
+        let lastPct = -1;
+
+        // Handle client disconnect
+        req.on('close', () => {
+            activeRender && (activeRender.aborted = true);
+        });
+
+        try {
+            const inputProps = buildCascadeInputProps(req.body, params);
+
+            const outputFilename = `cascade-${Date.now()}.${preset.codec.startsWith('prores') ? 'mov' : 'mp4'}`;
+            const outputPath = path.join(PATHS.OUT_DIR, outputFilename);
+
+            send({ type: 'status', message: 'Selecting CascadeFailureScene composition...' });
+            const composition = await selectComposition({
+                serveUrl: bundleState.location,
+                id: RENDER_CONFIG.CASCADE_COMPOSITION_ID,
+                inputProps,
+            });
+
+            send({ type: 'status', message: 'Rendering cascade frames...' });
             const { opts, finalPath } = buildRenderOptions(composition, outputPath, inputProps, preset, ({ progress }) => {
                 const pct = Math.round(progress * 100);
                 if (pct > lastPct) {

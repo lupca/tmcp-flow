@@ -1296,3 +1296,108 @@ body {
   border-color: rgba(239, 68, 68, 0.4);
   color: #fff;
 }
+
+/* ═══════════════════════════════════════════
+   Cascade Failure Editor — Page Layout
+   ═══════════════════════════════════════════ */
+
+.cascade-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #0B0F19;
+}
+
+.cascade-sidebar-left {
+  width: 340px;
+  min-width: 340px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 16px;
+  overflow: hidden;
+}
+
+.cascade-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.cascade-canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.cascade-canvas .react-flow {
+  background: #0B0F19 !important;
+}
+
+.cascade-scrubber {
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 4px 0 8px 0;
+}
+
+/* ── Cascade Event Cards ── */
+
+.cascade-event-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  transition: background 0.15s;
+}
+
+.cascade-event-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Cascade Info Cards (FX tab) ── */
+
+.cascade-info-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+/* ── Btn variants for cascade ── */
+
+.btn-sm {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-sm:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.btn-danger {
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #fca5a5 !important;
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.5) !important;
+  color: #fff !important;
+}

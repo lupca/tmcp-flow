@@ -106,4 +106,34 @@ function buildRenderOptions(composition, outputPath, inputProps, preset, onProgr
     return { opts, finalPath };
 }
 
-export { parseRenderParams, buildInputProps, buildRenderOptions };
+/**
+ * Build input properties for Cascade Failure Remotion composition
+ * @param {Object} body - Request body
+ * @param {Object} params - Parsed render parameters
+ * @returns {Object} Input props for CascadeFailureScene composition
+ */
+function buildCascadeInputProps(body, params) {
+    const inputNodes = body.nodes || [];
+
+    console.log('💥 Cascade Failure — Node sizes:');
+    inputNodes.forEach(node => {
+        if (node.type !== 'group') {
+            console.log(
+                `  - ${node.id}: width=${node.width || 'undefined'}, height=${node.height || 'undefined'}`
+            );
+        }
+    });
+
+    return {
+        nodes: inputNodes,
+        edges: body.edges || [],
+        cameraSequence: body.cameraSequence ?? [],
+        timelineEvents: body.timelineEvents ?? [],
+        renderWidth: params.renderWidth,
+        renderHeight: params.renderHeight,
+        renderDuration: params.renderDuration,
+        renderFps: params.renderFps,
+    };
+}
+
+export { parseRenderParams, buildInputProps, buildCascadeInputProps, buildRenderOptions };

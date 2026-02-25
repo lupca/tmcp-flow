@@ -1,6 +1,7 @@
 import React from 'react';
 import { Composition, registerRoot, useCurrentFrame, useVideoConfig } from 'remotion';
 import DynamicFlowScene from '../components/DynamicFlowScene';
+import CascadeFailureScene from '../components/CascadeFailureScene';
 
 // Import global CSS so Remotion's Webpack bundler includes them in the render
 import '@xyflow/react/dist/style.css';
@@ -14,6 +15,22 @@ const DynamicFlowSceneRemotion = (props) => {
 
     return (
         <DynamicFlowScene
+            {...props}
+            frame={frame}
+            width={width}
+            height={height}
+            isRemotion={true}
+        />
+    );
+};
+
+// Wrapper to inject Remotion frame & video config into the cascade component
+const CascadeFailureSceneRemotion = (props) => {
+    const frame = useCurrentFrame();
+    const { width, height } = useVideoConfig();
+
+    return (
+        <CascadeFailureScene
             {...props}
             frame={frame}
             width={width}
@@ -45,6 +62,28 @@ export const RemotionRoot = () => {
                     nodes: [],
                     edges: [],
                     cameraSequence: [],
+                }}
+            />
+            <Composition
+                id="CascadeFailureScene"
+                component={CascadeFailureSceneRemotion}
+                durationInFrames={600}
+                fps={60}
+                width={1080}
+                height={1920}
+                calculateMetadata={async ({ props }) => {
+                    return {
+                        width: props?.renderWidth || 1080,
+                        height: props?.renderHeight || 1920,
+                        durationInFrames: props?.renderDuration || 600,
+                        fps: props?.renderFps || 60,
+                    };
+                }}
+                defaultProps={{
+                    nodes: [],
+                    edges: [],
+                    cameraSequence: [],
+                    timelineEvents: [],
                 }}
             />
         </>

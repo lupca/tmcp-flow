@@ -53,6 +53,7 @@ const SERVER_CONFIG = {
 // ── Render Config ───────────────────────────────────────────────────────
 const RENDER_CONFIG = {
     COMPOSITION_ID: 'DynamicFlowScene',
+    CASCADE_COMPOSITION_ID: 'CascadeFailureScene',
     DEFAULT_WIDTH: 1080,
     DEFAULT_HEIGHT: 1920,
     DEFAULT_DURATION: 300,
