@@ -1,7 +1,7 @@
 import React from 'react';
 import { Composition, registerRoot, useCurrentFrame, useVideoConfig } from 'remotion';
-import DynamicFlowScene from '../components/DynamicFlowScene';
-import CascadeFailureScene from '../components/CascadeFailureScene';
+import DynamicFlowScene from '../components/DynamicFlowScene.jsx';
+import CascadeFailureScene from '../components/CascadeFailureScene.jsx';
 
 // Import global CSS so Remotion's Webpack bundler includes them in the render
 import '@xyflow/react/dist/style.css';

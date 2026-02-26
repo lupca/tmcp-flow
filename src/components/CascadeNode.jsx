@@ -1,7 +1,7 @@
 import React, { memo, useMemo } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { spring } from 'remotion';
-import { NODE_STATUS, COLORS } from '../constants/cascadeConstants';
+import { NODE_STATUS, COLORS } from '../constants/cascadeConstants.js';
 
 /**
  * Default fallback dimensions — matches project convention

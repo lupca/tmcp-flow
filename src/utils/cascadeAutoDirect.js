@@ -13,7 +13,7 @@ import {
   EDGE_VARIANT,
   GLOBAL_FX,
   CASCADE_DEFAULTS,
-} from '../constants/cascadeConstants';
+} from '../constants/cascadeConstants.js';
 
 // ── Dimension helpers ────────────────────────────────────────────────
 const DEFAULT_NODE_W = 220;
@@ -129,13 +129,13 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
   const cameraSequence = [];
 
   // ── Wide establishing shot ─────────────────────────────────────────
+  // Use fitView: true so resolveKeyframes computes correct viewport for
+  // the actual zoom level (avoids centering drift when zoom differs).
   const bounds = _fitAllBounds(nonGroupNodes, allNodes);
   const fitZoom = _fitZoom(bounds.spanX, bounds.spanY);
-  const estX = (1080 / 2) - (bounds.cx * fitZoom);
-  const estY = (1920 / 2) - (bounds.cy * fitZoom);
 
   let currentFrame = 0;
-  cameraSequence.push({ frame: 0, x: estX, y: estY, zoom: Math.max(fitZoom, 0.25), easing: 'smooth' });
+  cameraSequence.push({ frame: 0, fitView: true, zoom: Math.max(fitZoom, 0.25), easing: 'smooth' });
   currentFrame += holdPerNode; // Hold establishing shot
 
   // ── BFS infection spreading ────────────────────────────────────────
@@ -248,8 +248,7 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
   // ── Camera: pull back to wide shot for meltdown ────────────────────
   cameraSequence.push({
     frame: currentFrame - 10,
-    x: estX,
-    y: estY,
+    fitView: true,
     zoom: cameraZoomWide,
     easing: 'slow',
   });
@@ -266,8 +265,7 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
   const totalFrames = blackoutFrame + 90; // ~1.5s of blackout punchline
   cameraSequence.push({
     frame: totalFrames,
-    x: estX,
-    y: estY,
+    fitView: true,
     zoom: cameraZoomWide * 0.9,
     easing: 'slow',
   });

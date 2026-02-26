@@ -6,9 +6,9 @@ import {
 } from '@xyflow/react';
 import { interpolate, Easing, useCurrentFrame, Audio } from 'remotion';
 import '@xyflow/react/dist/style.css';
-import UniversalNode from './UniversalNode';
-import GroupNode from './GroupNode';
-import ViralEdge from './ViralEdge';
+import UniversalNode from './UniversalNode.jsx';
+import GroupNode from './GroupNode.jsx';
+import ViralEdge from './ViralEdge.jsx';
 
 // Register node & edge types outside the component to avoid re-creation
 const nodeTypes = { universal: UniversalNode, group: GroupNode };

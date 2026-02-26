@@ -24,7 +24,7 @@ import {
   DEMO_EDGES,
   DEMO_TIMELINE_EVENTS,
   DEMO_CAMERA_SEQUENCE,
-} from '../constants/cascadeConstants';
+} from '../constants/cascadeConstants.js';
 import {
   generateCascadeScenario,
   suggestOriginNode,

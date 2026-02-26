@@ -1,7 +1,7 @@
 import React, { memo, useMemo } from 'react';
 import { getBezierPath, EdgeLabelRenderer } from '@xyflow/react';
 import { useCurrentFrame, spring } from 'remotion';
-import { EDGE_VARIANT, COLORS } from '../constants/cascadeConstants';
+import { EDGE_VARIANT, COLORS } from '../constants/cascadeConstants.js';
 
 /**
  * CascadeEdge — Animated bezier edge that mutates from calm data-flow
