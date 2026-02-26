@@ -33,6 +33,7 @@ import {
 // ── Node/Edge types (static) ─────────────────────────────────────────
 const nodeTypes = { cascade: CascadeNode, group: GroupNode };
 const edgeTypes = { cascade: CascadeEdge };
+const PREVIEW_FPS = 30;
 
 /**
  * Derive node/edge visual state at a given preview frame.
@@ -172,7 +173,7 @@ function CascadeFailureInner() {
           }
           return next;
         });
-      }, 1000 / 60); // 60fps
+      }, 1000 / PREVIEW_FPS);
     }
     return () => {
       if (playIntervalRef.current) clearInterval(playIntervalRef.current);
@@ -269,7 +270,7 @@ function CascadeFailureInner() {
           renderWidth: 1080,
           renderHeight: 1920,
           renderDuration: totalFrames,
-          renderFps: 60,
+          renderFps: PREVIEW_FPS,
           quality: renderQuality,
         }),
       });
@@ -702,7 +703,7 @@ function CascadeFailureInner() {
               </div>
 
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
-                Duration: {totalFrames} frames ({(totalFrames / 60).toFixed(1)}s @ 60fps)
+                Duration: {totalFrames} frames ({(totalFrames / PREVIEW_FPS).toFixed(1)}s @ {PREVIEW_FPS}fps)
               </div>
 
               <button

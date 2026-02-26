@@ -67,16 +67,16 @@ export const RemotionRoot = () => {
             <Composition
                 id="CascadeFailureScene"
                 component={CascadeFailureSceneRemotion}
-                durationInFrames={600}
-                fps={60}
+                durationInFrames={900}
+                fps={30}
                 width={1080}
                 height={1920}
                 calculateMetadata={async ({ props }) => {
                     return {
                         width: props?.renderWidth || 1080,
                         height: props?.renderHeight || 1920,
-                        durationInFrames: props?.renderDuration || 600,
-                        fps: props?.renderFps || 60,
+                        durationInFrames: props?.renderDuration || 900,
+                        fps: props?.renderFps || 30,
                     };
                 }}
                 defaultProps={{

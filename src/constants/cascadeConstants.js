@@ -72,159 +72,185 @@ export const CASCADE_DEFAULTS = {
 };
 
 // ── Demo scenario ────────────────────────────────────────────────────
-// A small topology to showcase the cascade failure effect out-of-the-box.
+// A pristine Microservices + DevSecOps architecture with a zero-day cascade.
 export const DEMO_NODES = [
   {
-    id: 'gateway',
+    id: 'api-gateway',
     type: 'cascade',
-    position: { x: 430, y: 0 },
-    data: { title: 'API Gateway', subtitle: 'Load Balancer', icon: '🌐' },
-    width: 200,
+    position: { x: 440, y: 40 },
+    data: { title: 'API Gateway', subtitle: 'Edge Routing', icon: '🌐' },
+    width: 210,
     height: 90,
   },
   {
-    id: 'auth',
+    id: 'legacy-auth',
     type: 'cascade',
-    position: { x: 160, y: 200 },
-    data: { title: 'Auth Service', subtitle: 'OAuth 2.0', icon: '🔐' },
-    width: 200,
+    position: { x: 140, y: 220 },
+    data: { title: 'Legacy Auth', subtitle: 'Outdated SSO', icon: '🔓' },
+    width: 210,
     height: 90,
   },
   {
-    id: 'user-svc',
+    id: 'user-db',
     type: 'cascade',
-    position: { x: 700, y: 200 },
-    data: { title: 'User Service', subtitle: 'PostgreSQL', icon: '👤' },
-    width: 200,
+    position: { x: 740, y: 220 },
+    data: { title: 'User Database', subtitle: 'PII Vault', icon: '🗃️' },
+    width: 210,
     height: 90,
   },
   {
-    id: 'cache',
+    id: 'payment-gateway',
     type: 'cascade',
-    position: { x: 160, y: 420 },
-    data: { title: 'Redis Cache', subtitle: 'In-Memory Store', icon: '⚡' },
-    width: 200,
+    position: { x: 740, y: 420 },
+    data: { title: 'Payment Gateway', subtitle: 'Card Processing', icon: '💳' },
+    width: 210,
     height: 90,
   },
   {
-    id: 'db-primary',
+    id: 'ledger-db',
     type: 'cascade',
-    position: { x: 700, y: 420 },
-    data: { title: 'DB Primary', subtitle: 'PostgreSQL Master', icon: '🗄️' },
-    width: 200,
+    position: { x: 740, y: 620 },
+    data: { title: 'Ledger Database', subtitle: 'Transactions', icon: '📒' },
+    width: 210,
     height: 90,
   },
   {
-    id: 'queue',
+    id: 'fraud-svc',
     type: 'cascade',
-    position: { x: 430, y: 420 },
-    data: { title: 'Message Queue', subtitle: 'RabbitMQ', icon: '📨' },
-    width: 200,
+    position: { x: 440, y: 520 },
+    data: { title: 'Fraud Service', subtitle: 'Risk Scoring', icon: '🧪' },
+    width: 210,
     height: 90,
   },
   {
-    id: 'worker',
+    id: 'secrets-vault',
     type: 'cascade',
-    position: { x: 430, y: 640 },
-    data: { title: 'Worker Pool', subtitle: 'Background Jobs', icon: '⚙️' },
-    width: 200,
+    position: { x: 140, y: 420 },
+    data: { title: 'Secrets Vault', subtitle: 'KMS + Tokens', icon: '🔑' },
+    width: 210,
     height: 90,
   },
   {
-    id: 'monitor',
+    id: 'devsecops',
     type: 'cascade',
-    position: { x: 160, y: 640 },
-    data: { title: 'Monitoring', subtitle: 'Prometheus + Grafana', icon: '📊' },
-    width: 200,
+    position: { x: 140, y: 620 },
+    data: { title: 'DevSecOps', subtitle: 'CI/CD Guardrails', icon: '🛡️' },
+    width: 210,
+    height: 90,
+  },
+  {
+    id: 'security-scanner',
+    type: 'cascade',
+    position: { x: 440, y: 740 },
+    data: { title: 'Security Scanner', subtitle: 'SAST/DAST', icon: '🧯' },
+    width: 210,
+    height: 90,
+  },
+  {
+    id: 'observability',
+    type: 'cascade',
+    position: { x: 740, y: 740 },
+    data: { title: 'Observability', subtitle: 'SIEM + Traces', icon: '📊' },
+    width: 210,
     height: 90,
   },
 ];
 
 export const DEMO_EDGES = [
-  { id: 'e-gw-auth', source: 'gateway', target: 'auth', type: 'cascade' },
-  { id: 'e-gw-user', source: 'gateway', target: 'user-svc', type: 'cascade' },
-  { id: 'e-auth-cache', source: 'auth', target: 'cache', type: 'cascade' },
-  { id: 'e-auth-queue', source: 'auth', target: 'queue', type: 'cascade' },
-  { id: 'e-user-db', source: 'user-svc', target: 'db-primary', type: 'cascade' },
-  { id: 'e-user-queue', source: 'user-svc', target: 'queue', type: 'cascade' },
-  { id: 'e-queue-worker', source: 'queue', target: 'worker', type: 'cascade' },
-  { id: 'e-cache-monitor', source: 'cache', target: 'monitor', type: 'cascade' },
+  { id: 'e-gw-auth', source: 'api-gateway', target: 'legacy-auth', type: 'cascade' },
+  { id: 'e-gw-user', source: 'api-gateway', target: 'user-db', type: 'cascade' },
+  { id: 'e-auth-user', source: 'legacy-auth', target: 'user-db', type: 'cascade' },
+  { id: 'e-auth-vault', source: 'legacy-auth', target: 'secrets-vault', type: 'cascade' },
+  { id: 'e-user-pay', source: 'user-db', target: 'payment-gateway', type: 'cascade' },
+  { id: 'e-pay-ledger', source: 'payment-gateway', target: 'ledger-db', type: 'cascade' },
+  { id: 'e-pay-fraud', source: 'payment-gateway', target: 'fraud-svc', type: 'cascade' },
+  { id: 'e-fraud-observe', source: 'fraud-svc', target: 'observability', type: 'cascade' },
+  { id: 'e-ledger-observe', source: 'ledger-db', target: 'observability', type: 'cascade' },
+  { id: 'e-devsec-scan', source: 'devsecops', target: 'security-scanner', type: 'cascade' },
+  { id: 'e-scan-gw', source: 'security-scanner', target: 'api-gateway', type: 'cascade' },
 ];
 
 /**
  * A pre-built cascade timeline where:
- *  - DB Primary crashes first (the "origin")
- *  - Error spreads back through user-svc and queue
- *  - Eventually gateway goes offline + screen shake
+ *  - Legacy Auth is breached first (the zero-day origin)
+ *  - Infection bypasses the gateway, hits User DB, then Payment Gateway
+ *  - The system collapses into a full data breach + blackout
  */
 export const DEMO_TIMELINE_EVENTS = [
-  // Phase 1 — Origin failure: DB Primary
-  { frame: 60,  type: EVENT_TYPE.NODE_STATE, targetId: 'db-primary', status: NODE_STATUS.WARNING },
-  { frame: 90,  type: EVENT_TYPE.NODE_STATE, targetId: 'db-primary', status: NODE_STATUS.ERROR },
-  { frame: 90,  type: EVENT_TYPE.EDGE_FLOW,  targetId: 'e-user-db',  variant: EDGE_VARIANT.DANGER },
+  // Phase 1 — Origin failure: Legacy Auth
+  { frame: 120, type: EVENT_TYPE.NODE_STATE, targetId: 'legacy-auth', status: NODE_STATUS.WARNING },
+  { frame: 180, type: EVENT_TYPE.NODE_STATE, targetId: 'legacy-auth', status: NODE_STATUS.ERROR },
+  { frame: 180, type: EVENT_TYPE.EDGE_FLOW, targetId: 'e-auth-user', variant: EDGE_VARIANT.DANGER },
+  { frame: 180, type: EVENT_TYPE.EDGE_FLOW, targetId: 'e-auth-vault', variant: EDGE_VARIANT.DANGER },
 
-  // Phase 2 — Propagation: User Service & Queue
-  { frame: 120, type: EVENT_TYPE.NODE_STATE, targetId: 'user-svc',   status: NODE_STATUS.WARNING },
-  { frame: 120, type: EVENT_TYPE.EDGE_FLOW,  targetId: 'e-user-queue', variant: EDGE_VARIANT.DANGER },
-  { frame: 150, type: EVENT_TYPE.NODE_STATE, targetId: 'user-svc',   status: NODE_STATUS.ERROR },
-  { frame: 150, type: EVENT_TYPE.NODE_STATE, targetId: 'queue',      status: NODE_STATUS.WARNING },
-  { frame: 150, type: EVENT_TYPE.EDGE_FLOW,  targetId: 'e-gw-user',  variant: EDGE_VARIANT.DANGER },
+  // Phase 2 — User DB compromise
+  { frame: 240, type: EVENT_TYPE.NODE_STATE, targetId: 'user-db', status: NODE_STATUS.WARNING },
+  { frame: 300, type: EVENT_TYPE.NODE_STATE, targetId: 'user-db', status: NODE_STATUS.ERROR },
+  { frame: 300, type: EVENT_TYPE.EDGE_FLOW, targetId: 'e-user-pay', variant: EDGE_VARIANT.DANGER },
 
-  // Phase 3 — Cascade deepens
-  { frame: 180, type: EVENT_TYPE.NODE_STATE, targetId: 'queue',      status: NODE_STATUS.ERROR },
-  { frame: 180, type: EVENT_TYPE.EDGE_FLOW,  targetId: 'e-queue-worker', variant: EDGE_VARIANT.DANGER },
-  { frame: 180, type: EVENT_TYPE.EDGE_FLOW,  targetId: 'e-auth-queue',   variant: EDGE_VARIANT.DANGER },
-  { frame: 210, type: EVENT_TYPE.NODE_STATE, targetId: 'worker',     status: NODE_STATUS.ERROR },
-  { frame: 210, type: EVENT_TYPE.NODE_STATE, targetId: 'auth',       status: NODE_STATUS.WARNING },
+  // Phase 3 — Secrets Vault & Payment escalation
+  { frame: 240, type: EVENT_TYPE.NODE_STATE, targetId: 'secrets-vault', status: NODE_STATUS.WARNING },
+  { frame: 300, type: EVENT_TYPE.NODE_STATE, targetId: 'secrets-vault', status: NODE_STATUS.ERROR },
+  { frame: 330, type: EVENT_TYPE.NODE_STATE, targetId: 'payment-gateway', status: NODE_STATUS.WARNING },
+  { frame: 390, type: EVENT_TYPE.NODE_STATE, targetId: 'payment-gateway', status: NODE_STATUS.ERROR },
+  { frame: 390, type: EVENT_TYPE.EDGE_FLOW, targetId: 'e-pay-ledger', variant: EDGE_VARIANT.DANGER },
+  { frame: 390, type: EVENT_TYPE.EDGE_FLOW, targetId: 'e-pay-fraud', variant: EDGE_VARIANT.DANGER },
 
-  // Phase 4 — Auth & Cache collapse
-  { frame: 240, type: EVENT_TYPE.NODE_STATE, targetId: 'auth',       status: NODE_STATUS.ERROR },
-  { frame: 240, type: EVENT_TYPE.EDGE_FLOW,  targetId: 'e-gw-auth',  variant: EDGE_VARIANT.DANGER },
-  { frame: 240, type: EVENT_TYPE.EDGE_FLOW,  targetId: 'e-auth-cache', variant: EDGE_VARIANT.DANGER },
-  { frame: 270, type: EVENT_TYPE.NODE_STATE, targetId: 'cache',      status: NODE_STATUS.ERROR },
-  { frame: 270, type: EVENT_TYPE.EDGE_FLOW,  targetId: 'e-cache-monitor', variant: EDGE_VARIANT.DANGER },
+  // Phase 4 — Ledger + Fraud collapse
+  { frame: 450, type: EVENT_TYPE.NODE_STATE, targetId: 'ledger-db', status: NODE_STATUS.WARNING },
+  { frame: 510, type: EVENT_TYPE.NODE_STATE, targetId: 'ledger-db', status: NODE_STATUS.ERROR },
+  { frame: 465, type: EVENT_TYPE.NODE_STATE, targetId: 'fraud-svc', status: NODE_STATUS.WARNING },
+  { frame: 525, type: EVENT_TYPE.NODE_STATE, targetId: 'fraud-svc', status: NODE_STATUS.ERROR },
+  { frame: 525, type: EVENT_TYPE.EDGE_FLOW, targetId: 'e-fraud-observe', variant: EDGE_VARIANT.DANGER },
+  { frame: 525, type: EVENT_TYPE.EDGE_FLOW, targetId: 'e-ledger-observe', variant: EDGE_VARIANT.DANGER },
 
-  // Phase 5 — Total system failure
-  { frame: 300, type: EVENT_TYPE.NODE_STATE, targetId: 'gateway',    status: NODE_STATUS.ERROR },
-  { frame: 300, type: EVENT_TYPE.NODE_STATE, targetId: 'monitor',    status: NODE_STATUS.WARNING },
-  { frame: 330, type: EVENT_TYPE.NODE_STATE, targetId: 'monitor',    status: NODE_STATUS.ERROR },
+  // Phase 5 — Gateway & Observability fail late
+  { frame: 540, type: EVENT_TYPE.NODE_STATE, targetId: 'api-gateway', status: NODE_STATUS.WARNING },
+  { frame: 600, type: EVENT_TYPE.NODE_STATE, targetId: 'api-gateway', status: NODE_STATUS.ERROR },
+  { frame: 600, type: EVENT_TYPE.NODE_STATE, targetId: 'observability', status: NODE_STATUS.WARNING },
+  { frame: 660, type: EVENT_TYPE.NODE_STATE, targetId: 'observability', status: NODE_STATUS.ERROR },
 
   // Phase 6 — Global FX: system meltdown
-  { frame: 340, type: EVENT_TYPE.GLOBAL_FX,  effect: GLOBAL_FX.SCREEN_SHAKE },
-  { frame: 380, type: EVENT_TYPE.GLOBAL_FX,  effect: GLOBAL_FX.GLITCH },
+  { frame: 690, type: EVENT_TYPE.GLOBAL_FX, effect: GLOBAL_FX.SCREEN_SHAKE },
+  { frame: 750, type: EVENT_TYPE.GLOBAL_FX, effect: GLOBAL_FX.GLITCH },
 
   // Phase 7 — Nodes go offline one by one
-  { frame: 400, type: EVENT_TYPE.NODE_STATE, targetId: 'db-primary', status: NODE_STATUS.OFFLINE },
-  { frame: 410, type: EVENT_TYPE.NODE_STATE, targetId: 'user-svc',   status: NODE_STATUS.OFFLINE },
-  { frame: 420, type: EVENT_TYPE.NODE_STATE, targetId: 'queue',      status: NODE_STATUS.OFFLINE },
-  { frame: 430, type: EVENT_TYPE.NODE_STATE, targetId: 'worker',     status: NODE_STATUS.OFFLINE },
-  { frame: 440, type: EVENT_TYPE.NODE_STATE, targetId: 'auth',       status: NODE_STATUS.OFFLINE },
-  { frame: 450, type: EVENT_TYPE.NODE_STATE, targetId: 'cache',      status: NODE_STATUS.OFFLINE },
-  { frame: 460, type: EVENT_TYPE.NODE_STATE, targetId: 'gateway',    status: NODE_STATUS.OFFLINE },
-  { frame: 470, type: EVENT_TYPE.NODE_STATE, targetId: 'monitor',    status: NODE_STATUS.OFFLINE },
+  { frame: 810, type: EVENT_TYPE.NODE_STATE, targetId: 'legacy-auth', status: NODE_STATUS.OFFLINE },
+  { frame: 822, type: EVENT_TYPE.NODE_STATE, targetId: 'user-db', status: NODE_STATUS.OFFLINE },
+  { frame: 834, type: EVENT_TYPE.NODE_STATE, targetId: 'payment-gateway', status: NODE_STATUS.OFFLINE },
+  { frame: 846, type: EVENT_TYPE.NODE_STATE, targetId: 'ledger-db', status: NODE_STATUS.OFFLINE },
+  { frame: 858, type: EVENT_TYPE.NODE_STATE, targetId: 'fraud-svc', status: NODE_STATUS.OFFLINE },
+  { frame: 870, type: EVENT_TYPE.NODE_STATE, targetId: 'secrets-vault', status: NODE_STATUS.OFFLINE },
+  { frame: 882, type: EVENT_TYPE.NODE_STATE, targetId: 'api-gateway', status: NODE_STATUS.OFFLINE },
+  { frame: 894, type: EVENT_TYPE.NODE_STATE, targetId: 'observability', status: NODE_STATUS.OFFLINE },
+  { frame: 906, type: EVENT_TYPE.NODE_STATE, targetId: 'devsecops', status: NODE_STATUS.OFFLINE },
+  { frame: 918, type: EVENT_TYPE.NODE_STATE, targetId: 'security-scanner', status: NODE_STATUS.OFFLINE },
+
   // Phase 8 — Blackout CTA punchline
-  { frame: 490, type: EVENT_TYPE.GLOBAL_FX, effect: GLOBAL_FX.BLACKOUT_CTA },];
+  { frame: 960, type: EVENT_TYPE.GLOBAL_FX, effect: GLOBAL_FX.BLACKOUT_CTA },
+];
 
 export const DEMO_CAMERA_SEQUENCE = [
   // Wide establishing shot — auto-centered via fitView
-  { frame: 0, fitView: true, zoom: 0.4, easing: 'smooth' },
-  // Zoom into DB Primary (origin of failure)
-  { frame: 50,  targetNodeId: 'db-primary', zoom: 1.6, easing: 'smooth' },
-  { frame: 110, targetNodeId: 'db-primary', zoom: 1.6, easing: 'smooth' },
-  // Whip-pan to User Service
-  { frame: 140, targetNodeId: 'user-svc', zoom: 1.5, easing: 'snap' },
-  // Pan to Queue
-  { frame: 175, targetNodeId: 'queue', zoom: 1.4, easing: 'snap' },
-  // Pan to Worker
-  { frame: 205, targetNodeId: 'worker', zoom: 1.5, easing: 'snap' },
-  // Pan to Auth
-  { frame: 235, targetNodeId: 'auth', zoom: 1.5, easing: 'snap' },
-  // Pan to Cache
-  { frame: 265, targetNodeId: 'cache', zoom: 1.5, easing: 'snap' },
-  // Pull back to Gateway  
-  { frame: 295, targetNodeId: 'gateway', zoom: 1.4, easing: 'snap' },
+  { frame: 0, fitView: true, zoom: 0.38, easing: 'smooth' },
+  // Zoom into Legacy Auth (origin of failure)
+  { frame: 110, targetNodeId: 'legacy-auth', zoom: 1.55, easing: 'slow' },
+  { frame: 210, targetNodeId: 'legacy-auth', zoom: 1.55, easing: 'slow' },
+  // Track the breach into User DB
+  { frame: 260, targetNodeId: 'user-db', zoom: 1.55, easing: 'slow' },
+  { frame: 340, targetNodeId: 'user-db', zoom: 1.55, easing: 'slow' },
+  // Payment gateway escalation
+  { frame: 370, targetNodeId: 'payment-gateway', zoom: 1.5, easing: 'slow' },
+  { frame: 460, targetNodeId: 'payment-gateway', zoom: 1.5, easing: 'slow' },
+  // Ledger + Fraud collapse
+  { frame: 490, targetNodeId: 'ledger-db', zoom: 1.45, easing: 'slow' },
+  { frame: 550, targetNodeId: 'fraud-svc', zoom: 1.45, easing: 'slow' },
+  // Gateway finally fails
+  { frame: 610, targetNodeId: 'api-gateway', zoom: 1.4, easing: 'slow' },
+  // Observability goes dark
+  { frame: 670, targetNodeId: 'observability', zoom: 1.4, easing: 'slow' },
   // Wide shot for the meltdown — auto-centered via fitView
-  { frame: 330, fitView: true, zoom: 0.5, easing: 'slow' },
-  // Hold wide for screen shake — auto-centered via fitView
-  { frame: 480, fitView: true, zoom: 0.45, easing: 'slow' },
+  { frame: 720, fitView: true, zoom: 0.42, easing: 'slow' },
+  // Hold wide for blackout
+  { frame: 960, fitView: true, zoom: 0.4, easing: 'slow' },
 ];

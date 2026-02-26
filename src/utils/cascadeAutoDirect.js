@@ -139,115 +139,160 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
   cameraSequence.push({ frame: 0, fitView: true, zoom: Math.max(fitZoom, 0.25), easing: 'smooth' });
   currentFrame += initialDelay; // Pause to let audience see healthy system
 
-  // ── BFS infection spreading ────────────────────────────────────────
+  // ── BFS infection spreading WITH PARALLEL BRANCHES ─────────────────
   const visited = new Set();
-  const queue = [{ nodeId: originNodeId, arrivalFrame: currentFrame, isOrigin: true }];
+  const bfsLevels = []; // Track nodes by BFS depth for parallel storytelling
+  
+  // Phase 1: BFS to collect infection waves
+  let queue = [{ nodeId: originNodeId, depth: 0 }];
   visited.add(originNodeId);
-
-  // Track infection order for camera
-  const infectionOrder = [];
-  let isFirstNode = true;
+  bfsLevels.push([{ nodeId: originNodeId, depth: 0 }]);
 
   while (queue.length > 0) {
-    const { nodeId, arrivalFrame, isOrigin } = queue.shift();
-    const node = nonGroupNodes.find((n) => n.id === nodeId);
-    if (!node) continue;
-
-    // Warning → Error transition
-    const warningFrame = arrivalFrame;
-    const errorFrame = arrivalFrame + warningDuration;
-
-    timelineEvents.push({
-      frame: warningFrame,
-      type: EVENT_TYPE.NODE_STATE,
-      targetId: nodeId,
-      status: NODE_STATUS.WARNING,
-    });
-
-    timelineEvents.push({
-      frame: errorFrame,
-      type: EVENT_TYPE.NODE_STATE,
-      targetId: nodeId,
-      status: NODE_STATUS.ERROR,
-    });
-
-    infectionOrder.push({ nodeId, frame: warningFrame });
-
-    // Camera: pan to this node with slow easing for dramatic effect
-    cameraSequence.push({
-      frame: Math.max(warningFrame - panFrames, cameraSequence[cameraSequence.length - 1]?.frame ?? 0),
-      targetNodeId: nodeId,
-      zoom: cameraZoom,
-      easing: 'slow',  // Changed from 'snap' to 'slow' for deliberate, suspenseful motion
-    });
-
-    // Hold on this node
-    cameraSequence.push({
-      frame: errorFrame,
-      targetNodeId: nodeId,
-      zoom: cameraZoom,
-      easing: 'slow',
-    });
-
-    // Special case: first node failure gets an extra pause before cascade spreads
-    let spreadFrame = errorFrame + spreadDelay;
-    if (isFirstNode) {
-      spreadFrame = errorFrame + firstNodePause + spreadDelay;
-      isFirstNode = false;
-    }
-
-    // Spread to neighbors
+    const { nodeId, depth } = queue.shift();
     const neighbors = adjacency[nodeId] || [];
+    
     for (const neighborId of neighbors) {
       if (visited.has(neighborId)) continue;
       visited.add(neighborId);
+      
+      const nextDepth = depth + 1;
+      if (!bfsLevels[nextDepth]) bfsLevels[nextDepth] = [];
+      bfsLevels[nextDepth].push({ nodeId: neighborId, depth: nextDepth });
+      queue.push({ nodeId: neighborId, depth: nextDepth });
+    }
+  }
 
-      // Find the connecting edge
-      const edge = _findEdge(edges, nodeId, neighborId);
-      if (edge) {
-        // Edge turns danger when error propagates
-        timelineEvents.push({
-          frame: errorFrame,
-          type: EVENT_TYPE.EDGE_FLOW,
-          targetId: edge.id,
-          variant: EDGE_VARIANT.DANGER,
-        });
+  // ── Phase 2: Generate timeline with DRAMATIC PACING ────────────────
+  // Each BFS level is a "story phase" with internal parallelism
+  const infectionOrder = [];
+  let isOriginPhase = true;
+  
+  for (let levelIdx = 0; levelIdx < bfsLevels.length; levelIdx++) {
+    const levelNodes = bfsLevels[levelIdx];
+    const isLastLevel = levelIdx === bfsLevels.length - 1;
+    
+    // Phase break: dramatic pause between BFS levels (except first)
+    if (levelIdx > 0) {
+      const phaseGap = isOriginPhase ? firstNodePause : Math.floor(spreadDelay * 1.5);
+      currentFrame += phaseGap;
+      isOriginPhase = false;
+    }
+
+    // Parallel infection: all nodes in this level start warning at SAME frame
+    const levelWarningFrame = currentFrame;
+    const levelErrorFrame = levelWarningFrame + warningDuration;
+    
+    // Sort level nodes by importance (heuristic: more connections = more dramatic)
+    const sortedLevel = levelNodes
+      .map(({ nodeId }) => ({
+        nodeId,
+        importance: (adjacency[nodeId] || []).length,
+      }))
+      .sort((a, b) => b.importance - a.importance);
+
+    // Apply events for all nodes in this level
+    for (const { nodeId } of sortedLevel) {
+      const node = nonGroupNodes.find((n) => n.id === nodeId);
+      if (!node) continue;
+
+      timelineEvents.push({
+        frame: levelWarningFrame,
+        type: EVENT_TYPE.NODE_STATE,
+        targetId: nodeId,
+        status: NODE_STATUS.WARNING,
+      });
+
+      timelineEvents.push({
+        frame: levelErrorFrame,
+        type: EVENT_TYPE.NODE_STATE,
+        targetId: nodeId,
+        status: NODE_STATUS.ERROR,
+      });
+
+      infectionOrder.push({ nodeId, frame: levelWarningFrame, depth: levelIdx, importance: (adjacency[nodeId] || []).length });
+
+      // Edges: turn danger when THIS node errors
+      const neighbors = adjacency[nodeId] || [];
+      for (const neighborId of neighbors) {
+        const edge = _findEdge(edges, nodeId, neighborId);
+        if (edge) {
+          timelineEvents.push({
+            frame: levelErrorFrame,
+            type: EVENT_TYPE.EDGE_FLOW,
+            targetId: edge.id,
+            variant: EDGE_VARIANT.DANGER,
+          });
+        }
       }
+    }
 
-      // Schedule neighbor infection
-      queue.push({
-        nodeId: neighborId,
-        arrivalFrame: spreadFrame,
-        isOrigin: false,
+    // Camera: focus on MOST IMPORTANT node in this level for storytelling
+    const heroNode = sortedLevel[0];
+    if (heroNode) {
+      const panStart = Math.max(
+        levelWarningFrame - panFrames,
+        cameraSequence[cameraSequence.length - 1]?.frame ?? 0
+      );
+
+      cameraSequence.push({
+        frame: panStart,
+        targetNodeId: heroNode.nodeId,
+        zoom: cameraZoom + (isOriginPhase ? 0.2 : 0), // Slightly tighter on origin
+        easing: 'slow',
+      });
+
+      // Hold through error transition
+      const dramaticHold = isOriginPhase ? holdPerNode * 1.5 : holdPerNode;
+      cameraSequence.push({
+        frame: levelErrorFrame + Math.floor(dramaticHold * 0.3),
+        targetNodeId: heroNode.nodeId,
+        zoom: cameraZoom + (isOriginPhase ? 0.2 : 0),
+        easing: 'slow',
       });
     }
+
+    // Advance frame for next level
+    currentFrame = levelErrorFrame + spreadDelay;
   }
 
   // ── Update currentFrame to after last infection ────────────────────
   const lastEvent = [...timelineEvents]
-    .filter((e) => e.type === EVENT_TYPE.NODE_STATE)
+    .filter((e) => e.type === EVENT_TYPE.NODE_STATE && e.status === NODE_STATUS.ERROR)
     .sort((a, b) => b.frame - a.frame)[0];
-  currentFrame = (lastEvent?.frame ?? currentFrame) + holdPerNode;
+  currentFrame = (lastEvent?.frame ?? currentFrame) + Math.floor(holdPerNode * 1.2);
 
   // ── Global FX: screen shake after all nodes infected ───────────────
+  const shakeFrame = currentFrame;
   timelineEvents.push({
-    frame: currentFrame,
+    frame: shakeFrame,
     type: EVENT_TYPE.GLOBAL_FX,
     effect: GLOBAL_FX.SCREEN_SHAKE,
   });
 
   // Glitch shortly after
+  const glitchFrame = shakeFrame + screenShakeDelay;
   timelineEvents.push({
-    frame: currentFrame + screenShakeDelay,
+    frame: glitchFrame,
     type: EVENT_TYPE.GLOBAL_FX,
     effect: GLOBAL_FX.GLITCH,
   });
 
-  // ── Nodes go offline one by one (staggered for visual drama) ────────────────
-  // Stagger at 10 frames between each node's offline event for dramatic collapse
-  let offlineFrame = currentFrame + screenShakeDelay + 20;
-  const offlineStagger = 10;
-  for (const { nodeId } of infectionOrder) {
+  // ── Camera: pull back to wide shot for meltdown ────────────────────
+  cameraSequence.push({
+    frame: Math.max(shakeFrame - panFrames, cameraSequence[cameraSequence.length - 1]?.frame ?? 0),
+    fitView: true,
+    zoom: cameraZoomWide,
+    easing: 'slow',
+  });
+
+  // ── Nodes go offline BY STORY IMPORTANCE, not infection order ──────
+  // Most connected nodes (critical infrastructure) fail last for dramatic irony
+  const offlineOrder = [...infectionOrder].sort((a, b) => a.importance - b.importance);
+  let offlineFrame = glitchFrame + Math.floor(screenShakeDelay * 0.8);
+  const offlineStagger = 12; // 0.4 seconds between each collapse
+
+  for (const { nodeId } of offlineOrder) {
     timelineEvents.push({
       frame: offlineFrame,
       type: EVENT_TYPE.NODE_STATE,
@@ -257,16 +302,8 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
     offlineFrame += offlineStagger;
   }
 
-  // ── Camera: pull back to wide shot for meltdown ────────────────────
-  cameraSequence.push({
-    frame: currentFrame - 10,
-    fitView: true,
-    zoom: cameraZoomWide,
-    easing: 'slow',
-  });
-
   // ── Blackout CTA punchline ─────────────────────────────────────────
-  const blackoutFrame = offlineFrame + 10;
+  const blackoutFrame = offlineFrame + Math.floor(offlineStagger * 2);
   timelineEvents.push({
     frame: blackoutFrame,
     type: EVENT_TYPE.GLOBAL_FX,
@@ -276,9 +313,9 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
   // Hold wide for the finale, then blackout
   const totalFrames = blackoutFrame + 90; // Final 90 frames for blackout CTA
   cameraSequence.push({
-    frame: totalFrames,
+    frame: blackoutFrame,
     fitView: true,
-    zoom: cameraZoomWide * 0.9,
+    zoom: cameraZoomWide * 0.95,
     easing: 'slow',
   });
 
