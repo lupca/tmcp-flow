@@ -81,8 +81,8 @@ const CascadeEdge = ({
   const dashSpeed = isDanger ? frame * -8 : frame * -2;
   const dashArray = isDanger ? '12 8' : '8 6';
 
-  // Particle speed: normal = 3s, danger = 1s
-  const particleDur = isDanger ? '1s' : '3s';
+  // Particle speed: normal = 5s (slow), danger = 2.5s (slower infection travel)
+  const particleDur = isDanger ? '2.5s' : '5s';
   const particleRadius = isDanger ? 5 + dangerProgress * 2 : 4;
 
   // Extra infection pulses for danger mode
@@ -154,7 +154,7 @@ const CascadeEdge = ({
         <animateMotion dur={particleDur} repeatCount="indefinite" path={path} />
       </circle>
 
-      {/* Danger: infection pulse particles (staggered) */}
+      {/* Danger: infection pulse particles (staggered, slowed) */}
       {showInfectionPulses && (
         <>
           <circle
@@ -163,7 +163,7 @@ const CascadeEdge = ({
             opacity={0.7 * dangerProgress}
             filter={`url(#${filterId})`}
           >
-            <animateMotion dur="0.7s" repeatCount="indefinite" path={path} begin="0.25s" />
+            <animateMotion dur="1.8s" repeatCount="indefinite" path={path} begin="0.25s" />
           </circle>
           <circle
             r={3}
@@ -171,12 +171,12 @@ const CascadeEdge = ({
             opacity={0.5 * dangerProgress}
             filter={`url(#${filterId})`}
           >
-            <animateMotion dur="0.9s" repeatCount="indefinite" path={path} begin="0.5s" />
+            <animateMotion dur="2.2s" repeatCount="indefinite" path={path} begin="0.5s" />
           </circle>
         </>
       )}
 
-      {/* Danger: pulsating "alert ring" traveling the path */}
+      {/* Danger: pulsating "alert ring" traveling the path (slowed) */}
       {isDanger && dangerProgress > 0.3 && (
         <circle
           r={8}
@@ -185,9 +185,9 @@ const CascadeEdge = ({
           strokeWidth={2}
           opacity={0.4 * dangerProgress}
         >
-          <animateMotion dur="1.2s" repeatCount="indefinite" path={path} />
-          <animate attributeName="r" values="8;14;8" dur="0.6s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values={`${0.4 * dangerProgress};0;${0.4 * dangerProgress}`} dur="0.6s" repeatCount="indefinite" />
+          <animateMotion dur="2s" repeatCount="indefinite" path={path} />
+          <animate attributeName="r" values="8;14;8" dur="1.5s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values={`${0.4 * dangerProgress};0;${0.4 * dangerProgress}`} dur="1.5s" repeatCount="indefinite" />
         </circle>
       )}
 

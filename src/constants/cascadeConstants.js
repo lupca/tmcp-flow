@@ -60,13 +60,15 @@ export const COLORS = {
 
 // ── Cascade Auto-Director defaults ───────────────────────────────────
 export const CASCADE_DEFAULTS = {
-  SPREAD_DELAY: 30,       // frames between node infection hops
-  WARNING_DURATION: 30,   // frames a node stays in WARNING before ERROR
-  HOLD_PER_NODE: 45,      // frames camera holds on each infected node
-  CAMERA_ZOOM: 1.5,       // zoom level when tracking infected node
-  CAMERA_ZOOM_WIDE: 0.4,  // wide establishing/closing shot zoom
-  PAN_FRAMES: 24,         // base frames for camera pan transition
-  SCREEN_SHAKE_DELAY: 30, // frames after last infection before shake
+  INITIAL_DELAY: 90,        // frames for setup phase: healthy system pause (3 seconds)
+  FIRST_NODE_PAUSE: 45,     // frames to hold on origin node after first failure (1.5 seconds)
+  SPREAD_DELAY: 30,         // frames between node infection hops (particle animation carries the drama)
+  WARNING_DURATION: 45,     // frames a node stays in WARNING before ERROR
+  HOLD_PER_NODE: 50,        // frames camera holds on each infected node (1.67 seconds)
+  CAMERA_ZOOM: 1.5,         // zoom level when tracking infected node
+  CAMERA_ZOOM_WIDE: 0.4,    // wide establishing/closing shot zoom
+  PAN_FRAMES: 35,           // base frames for camera pan transition (slow, deliberate)
+  SCREEN_SHAKE_DELAY: 45,   // frames after last infection before shake
 };
 
 // ── Demo scenario ────────────────────────────────────────────────────

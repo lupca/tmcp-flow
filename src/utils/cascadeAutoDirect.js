@@ -97,6 +97,8 @@ function _findEdge(edges, nodeA, nodeB) {
  */
 export function generateCascadeScenario(nodes, edges, originNodeId, config = {}) {
   const {
+    initialDelay = CASCADE_DEFAULTS.INITIAL_DELAY,
+    firstNodePause = CASCADE_DEFAULTS.FIRST_NODE_PAUSE,
     spreadDelay = CASCADE_DEFAULTS.SPREAD_DELAY,
     warningDuration = CASCADE_DEFAULTS.WARNING_DURATION,
     holdPerNode = CASCADE_DEFAULTS.HOLD_PER_NODE,
@@ -128,26 +130,26 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
   const timelineEvents = [];
   const cameraSequence = [];
 
-  // ── Wide establishing shot ─────────────────────────────────────────
-  // Use fitView: true so resolveKeyframes computes correct viewport for
-  // the actual zoom level (avoids centering drift when zoom differs).
+  // ── Setup Phase: Wide establishing shot (healthy system) ───────────
+  // Let the audience read the architecture for INITIAL_DELAY frames.
   const bounds = _fitAllBounds(nonGroupNodes, allNodes);
   const fitZoom = _fitZoom(bounds.spanX, bounds.spanY);
 
   let currentFrame = 0;
   cameraSequence.push({ frame: 0, fitView: true, zoom: Math.max(fitZoom, 0.25), easing: 'smooth' });
-  currentFrame += holdPerNode; // Hold establishing shot
+  currentFrame += initialDelay; // Pause to let audience see healthy system
 
   // ── BFS infection spreading ────────────────────────────────────────
   const visited = new Set();
-  const queue = [{ nodeId: originNodeId, arrivalFrame: currentFrame }];
+  const queue = [{ nodeId: originNodeId, arrivalFrame: currentFrame, isOrigin: true }];
   visited.add(originNodeId);
 
   // Track infection order for camera
   const infectionOrder = [];
+  let isFirstNode = true;
 
   while (queue.length > 0) {
-    const { nodeId, arrivalFrame } = queue.shift();
+    const { nodeId, arrivalFrame, isOrigin } = queue.shift();
     const node = nonGroupNodes.find((n) => n.id === nodeId);
     if (!node) continue;
 
@@ -171,12 +173,12 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
 
     infectionOrder.push({ nodeId, frame: warningFrame });
 
-    // Camera: pan to this node
+    // Camera: pan to this node with slow easing for dramatic effect
     cameraSequence.push({
       frame: Math.max(warningFrame - panFrames, cameraSequence[cameraSequence.length - 1]?.frame ?? 0),
       targetNodeId: nodeId,
       zoom: cameraZoom,
-      easing: 'snap',
+      easing: 'slow',  // Changed from 'snap' to 'slow' for deliberate, suspenseful motion
     });
 
     // Hold on this node
@@ -184,8 +186,15 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
       frame: errorFrame,
       targetNodeId: nodeId,
       zoom: cameraZoom,
-      easing: 'smooth',
+      easing: 'slow',
     });
+
+    // Special case: first node failure gets an extra pause before cascade spreads
+    let spreadFrame = errorFrame + spreadDelay;
+    if (isFirstNode) {
+      spreadFrame = errorFrame + firstNodePause + spreadDelay;
+      isFirstNode = false;
+    }
 
     // Spread to neighbors
     const neighbors = adjacency[nodeId] || [];
@@ -208,7 +217,8 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
       // Schedule neighbor infection
       queue.push({
         nodeId: neighborId,
-        arrivalFrame: errorFrame + spreadDelay,
+        arrivalFrame: spreadFrame,
+        isOrigin: false,
       });
     }
   }
@@ -233,8 +243,10 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
     effect: GLOBAL_FX.GLITCH,
   });
 
-  // ── Nodes go offline one by one ────────────────────────────────────
+  // ── Nodes go offline one by one (staggered for visual drama) ────────────────
+  // Stagger at 10 frames between each node's offline event for dramatic collapse
   let offlineFrame = currentFrame + screenShakeDelay + 20;
+  const offlineStagger = 10;
   for (const { nodeId } of infectionOrder) {
     timelineEvents.push({
       frame: offlineFrame,
@@ -242,7 +254,7 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
       targetId: nodeId,
       status: NODE_STATUS.OFFLINE,
     });
-    offlineFrame += 10;
+    offlineFrame += offlineStagger;
   }
 
   // ── Camera: pull back to wide shot for meltdown ────────────────────
@@ -262,7 +274,7 @@ export function generateCascadeScenario(nodes, edges, originNodeId, config = {})
   });
 
   // Hold wide for the finale, then blackout
-  const totalFrames = blackoutFrame + 90; // ~1.5s of blackout punchline
+  const totalFrames = blackoutFrame + 90; // Final 90 frames for blackout CTA
   cameraSequence.push({
     frame: totalFrames,
     fitView: true,

@@ -10,11 +10,11 @@
 import React from 'react';
 import { interpolate } from 'remotion';
 
-const FADE_DURATION = 20;
-const TEXT_APPEAR_START = 10;
-const TEXT_APPEAR_END = 30;
-const SUBTITLE_START = 25;
-const SUBTITLE_END = 45;
+const FADE_DURATION = 40;
+const TEXT_APPEAR_START = 20;
+const TEXT_APPEAR_END = 60;
+const SUBTITLE_START = 40;
+const SUBTITLE_END = 80;
 const SCALE_KEYFRAMES = [0, 15, 25];
 const SCALE_VALUES = [0.8, 1.05, 1];
 
