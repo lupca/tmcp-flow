@@ -1,0 +1,186 @@
+
+Running 33 tests using 1 worker
+
+[1A[2K[1/33] [chromium] › e2e/refactoring.e2e.spec.ts:21:3 › E2E - Studio Page › should load Studio page without errors
+[1A[2K[2/33] [chromium] › e2e/refactoring.e2e.spec.ts:27:3 › E2E - Studio Page › should display AI prompt input in sidebar
+[1A[2K[3/33] [chromium] › e2e/refactoring.e2e.spec.ts:37:3 › E2E - Studio Page › should have ReactFlow canvas rendered
+[1A[2K[4/33] [chromium] › e2e/refactoring.e2e.spec.ts:46:3 › E2E - Studio Page › should have sidebar tabs (Blueprint, Directing, FX, Render)
+[1A[2K  1) [chromium] › e2e/refactoring.e2e.spec.ts:46:3 › E2E - Studio Page › should have sidebar tabs (Blueprint, Directing, FX, Render) 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThan[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected: > [32m0[39m
+    Received:   [31m0[39m
+
+      53 |     // At least one tab should exist
+      54 |     const tabCount = await page.locator('button[role="tab"], [role="tab"]').count();
+    > 55 |     expect(tabCount).toBeGreaterThan(0);
+         |                      ^
+      56 |   });
+      57 |
+      58 |   test('should allow editing nodes by clicking on canvas', async () => {
+        at /Users/bodoi17/projects/tmcp-flow/e2e/refactoring.e2e.spec.ts:55:22
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Stud-2694a-eprint-Directing-FX-Render--chromium/test-failed-3.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Stud-2694a-eprint-Directing-FX-Render--chromium/test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Stud-2694a-eprint-Directing-FX-Render--chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #4: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Stud-2694a-eprint-Directing-FX-Render--chromium/test-failed-4.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/refactoring.e2e-E2E---Stud-2694a-eprint-Directing-FX-Render--chromium/error-context.md
+
+
+[1A[2K[5/33] [chromium] › e2e/refactoring.e2e.spec.ts:58:3 › E2E - Studio Page › should allow editing nodes by clicking on canvas
+[1A[2K[6/33] [chromium] › e2e/refactoring.e2e.spec.ts:67:3 › E2E - Studio Page › should have timeline bar at bottom
+[1A[2K[7/33] [chromium] › e2e/refactoring.e2e.spec.ts:73:3 › E2E - Studio Page › should not have console errors
+[1A[2K[8/33] [chromium] › e2e/refactoring.e2e.spec.ts:97:3 › E2E - FlowManager Page › should load FlowManager page
+[1A[2K[9/33] [chromium] › e2e/refactoring.e2e.spec.ts:102:3 › E2E - FlowManager Page › should display flow header with title
+[1A[2K[10/33] [chromium] › e2e/refactoring.e2e.spec.ts:111:3 › E2E - FlowManager Page › should have flow list or grid
+[1A[2K[11/33] [chromium] › e2e/refactoring.e2e.spec.ts:120:3 › E2E - FlowManager Page › should have import functionality
+[1A[2K[12/33] [chromium] › e2e/refactoring.e2e.spec.ts:128:3 › E2E - FlowManager Page › should not have loading errors
+[1A[2K[13/33] [chromium] › e2e/refactoring.e2e.spec.ts:150:3 › E2E - CascadeFailure Page › should load CascadeFailure page
+[1A[2K[14/33] [chromium] › e2e/refactoring.e2e.spec.ts:155:3 › E2E - CascadeFailure Page › should have ReactFlow canvas for cascade
+[1A[2K[15/33] [chromium] › e2e/refactoring.e2e.spec.ts:160:3 › E2E - CascadeFailure Page › should have sidebar with tabs (Timeline, Auto, FX, Render)
+[1A[2K[16/33] [chromium] › e2e/refactoring.e2e.spec.ts:169:3 › E2E - CascadeFailure Page › should have playback controls (play, pause)
+[1A[2K  2) [chromium] › e2e/refactoring.e2e.spec.ts:169:3 › E2E - CascadeFailure Page › should have playback controls (play, pause) 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32mtrue[39m
+    Received: [31mfalse[39m
+
+      172 |     
+      173 |     const hasPlayback = await playButton.count() > 0 || await pauseButton.count() > 0;
+    > 174 |     expect(hasPlayback).toBe(true);
+          |                         ^
+      175 |   });
+      176 |
+      177 |   test('should have scrubber/timeline control', async () => {
+        at /Users/bodoi17/projects/tmcp-flow/e2e/refactoring.e2e.spec.ts:174:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-5.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-7.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-4.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #4: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-11.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #5: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #6: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-6.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #7: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-9.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #8: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-3.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #9: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #10: screenshot (image/png) ─────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-12.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #11: screenshot (image/png) ─────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-8.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #12: screenshot (image/png) ─────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/test-failed-10.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/refactoring.e2e-E2E---Casc-9cbc9-ayback-controls-play-pause--chromium/error-context.md
+
+
+[1A[2K[17/33] [chromium] › e2e/refactoring.e2e.spec.ts:177:3 › E2E - CascadeFailure Page › should have scrubber/timeline control
+[1A[2K[18/33] [chromium] › e2e/refactoring.e2e.spec.ts:182:3 › E2E - CascadeFailure Page › should have timeline events area
+[1A[2K[19/33] [chromium] › e2e/refactoring.e2e.spec.ts:195:3 › E2E - CascadeFailure Page › should not have console errors
+[1A[2K[20/33] [chromium] › e2e/refactoring.e2e.spec.ts:216:3 › E2E - Navigation & Router › should navigate between pages without errors
+[1A[2K  3) [chromium] › e2e/refactoring.e2e.spec.ts:216:3 › E2E - Navigation & Router › should navigate between pages without errors 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  - 1[39m
+    [31m+ Received  + 4[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",[39m
+    [31m+   "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",[39m
+    [31m+ ][39m
+
+      234 |     }
+      235 |
+    > 236 |     expect(errors).toEqual([]);
+          |                    ^
+      237 |   });
+      238 |
+      239 |   test('should handle invalid routes gracefully', async () => {
+        at /Users/bodoi17/projects/tmcp-flow/e2e/refactoring.e2e.spec.ts:236:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Navi-edbcd-etween-pages-without-errors-chromium/test-failed-3.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Navi-edbcd-etween-pages-without-errors-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Navi-edbcd-etween-pages-without-errors-chromium/test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #4: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/refactoring.e2e-E2E---Navi-edbcd-etween-pages-without-errors-chromium/test-failed-4.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/refactoring.e2e-E2E---Navi-edbcd-etween-pages-without-errors-chromium/error-context.md
+
+
+[1A[2K[21/33] [chromium] › e2e/refactoring.e2e.spec.ts:239:3 › E2E - Navigation & Router › should handle invalid routes gracefully
+[1A[2K[22/33] [chromium] › e2e/refactoring.e2e.spec.ts:255:3 › E2E - Component Integration Tests › should render without ref errors on Studio
+[1A[2K[23/33] [chromium] › e2e/refactoring.e2e.spec.ts:266:3 › E2E - Component Integration Tests › should render all Studio sidebar components
+[1A[2K[24/33] [chromium] › e2e/refactoring.e2e.spec.ts:280:3 › E2E - Component Integration Tests › should render FlowManager components without errors
+[1A[2K[25/33] [chromium] › e2e/refactoring.e2e.spec.ts:289:3 › E2E - Component Integration Tests › should render CascadeFailure components without errors
+[1A[2K[26/33] [chromium] › e2e/refactoring.e2e.spec.ts:306:3 › E2E - Performance & Stability › Studio page should load in reasonable time
+[1A[2K[27/33] [chromium] › e2e/refactoring.e2e.spec.ts:316:3 › E2E - Performance & Stability › FlowManager page should load in reasonable time
+[1A[2K[28/33] [chromium] › e2e/refactoring.e2e.spec.ts:325:3 › E2E - Performance & Stability › CascadeFailure page should load in reasonable time
+[1A[2K[29/33] [chromium] › e2e/refactoring.e2e.spec.ts:334:3 › E2E - Performance & Stability › should not have memory leaks on navigation
+[1A[2K[30/33] [chromium] › e2e/refactoring.e2e.spec.ts:358:3 › E2E - DOM Structure Validation › Studio page should have required root elements
+[1A[2K[31/33] [chromium] › e2e/refactoring.e2e.spec.ts:368:3 › E2E - DOM Structure Validation › FlowManager page should have required root elements
+[1A[2K[32/33] [chromium] › e2e/refactoring.e2e.spec.ts:375:3 › E2E - DOM Structure Validation › CascadeFailure page should have required root elements
+[1A[2K[33/33] [chromium] › e2e/refactoring.e2e.spec.ts:382:3 › E2E - DOM Structure Validation › should not have broken imports in console
+[1A[2K  3 failed
+    [chromium] › e2e/refactoring.e2e.spec.ts:46:3 › E2E - Studio Page › should have sidebar tabs (Blueprint, Directing, FX, Render) 
+    [chromium] › e2e/refactoring.e2e.spec.ts:169:3 › E2E - CascadeFailure Page › should have playback controls (play, pause) 
+    [chromium] › e2e/refactoring.e2e.spec.ts:216:3 › E2E - Navigation & Router › should navigate between pages without errors 
+  30 passed (1.2m)
+
+[36m  Serving HTML report at http://localhost:9323. Press Ctrl+C to quit.[39m

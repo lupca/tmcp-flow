@@ -165,6 +165,45 @@ export function deriveEdgeVariantMap(timelineEvents, frame) {
 }
 
 /**
+ * Derive processed nodes/edges at a preview frame for the editor.
+ * Keeps group nodes intact and updates cascade node/edge data.
+ */
+export function deriveStatesAtFrame(nodes, edges, timelineEvents, frame) {
+  const nodeStatusMap = deriveNodeStatusMap(timelineEvents, frame);
+  const edgeVariantMap = deriveEdgeVariantMap(timelineEvents, frame);
+
+  const processedNodes = nodes.map((node) => {
+    if (node.type === 'group') return node;
+    const info = nodeStatusMap.get(node.id);
+    return {
+      ...node,
+      type: 'cascade',
+      data: {
+        ...node.data,
+        status: info?.status ?? NODE_STATUS.NORMAL,
+        statusFrame: info?.frame ?? 0,
+        currentFrame: frame,
+      },
+    };
+  });
+
+  const processedEdges = edges.map((edge) => {
+    const info = edgeVariantMap.get(edge.id);
+    return {
+      ...edge,
+      type: 'cascade',
+      data: {
+        ...edge.data,
+        variant: info?.variant ?? EDGE_VARIANT.NORMAL,
+        variantFrame: info?.frame ?? 0,
+      },
+    };
+  });
+
+  return { processedNodes, processedEdges };
+}
+
+/**
  * Derive the set of currently-active global FX at the given frame.
  *
  * @param {Array}  timelineEvents - Sorted timeline event list
